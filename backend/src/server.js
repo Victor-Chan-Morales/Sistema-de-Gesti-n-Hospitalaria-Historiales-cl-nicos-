@@ -1,16 +1,31 @@
-require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
+const { exigirConfiguracion } = require('./config/env');
 
-const express = require('express');
+exigirConfiguracion();
 
-const app = express();
-app.use(express.json());
+const { crearApp } = require('./app');
+const { obtenerRepositorio, listarInstituciones, cerrarConexiones } = require('./factory/repositoryFactory');
+const credenciales = require('./adapters/seguridad/credencialesBcrypt');
+const { crearServicioTokens } = require('./adapters/seguridad/tokensJwt');
 
-app.get('/health', (req, res) => {
-  res.json({ estado: 'ok' });
+const app = crearApp({
+  obtenerRepositorio,
+  listarInstituciones,
+  credenciales,
+  tokens: crearServicioTokens(process.env.JWT_SECRET),
 });
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+const servidor = app.listen(PORT, () => {
   console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
+
+function apagar() {
+  servidor.close(async () => {
+    await cerrarConexiones();
+    process.exit(0);
+  });
+}
+
+process.on('SIGINT', apagar);
+process.on('SIGTERM', apagar);

@@ -1,0 +1,934 @@
+openapi: 3.0.3
+info:
+  title: Red de hospitales - API de historiales clínicos
+  version: 1.0.0
+  description: >
+    Contrato único para las cuatro instituciones: el JSON es idéntico sin importar el motor.
+    Los IDs son strings opacos. Las fechas son 'YYYY-MM-DD' y las fechas con hora
+    'YYYY-MM-DDTHH:MM:SS', en hora local de la institución. La institución sale del token,
+    nunca de la URL ni del cuerpo.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+tags:
+  - name: Autenticación
+  - name: Pacientes
+  - name: Citas
+  - name: Consultas
+  - name: Catálogos
+  - name: Salud
+
+paths:
+  /api/auth/login:
+    post:
+      tags: [Autenticación]
+      summary: Inicia sesión y enruta al motor de la institución del usuario
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [usuario, contrasena]
+              properties:
+                usuario: { type: string, maxLength: 50 }
+                contrasena: { type: string }
+      responses:
+        '200':
+          description: Sesión iniciada. El token dura 8 horas.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  usuario: { $ref: '#/components/schemas/Usuario' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '503': { $ref: '#/components/responses/MotorNoDisponible' }
+  /api/auth/yo:
+    get:
+      tags: [Autenticación]
+      summary: Perfil del usuario de la sesión
+      responses:
+        '200':
+          description: Perfil
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Usuario' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+
+  /api/pacientes:
+    get:
+      tags: [Pacientes]
+      summary: Busca pacientes
+      description: 'Roles: todos.'
+      parameters:
+        - { name: texto, in: query, schema: { type: string }, description: Nombres, apellidos o documento }
+        - { name: estado, in: query, schema: { $ref: '#/components/schemas/EstadoPaciente' } }
+        - { name: limite, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: desplazamiento, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: Página de resultados, sin colecciones anidadas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  elementos:
+                    type: array
+                    items: { $ref: '#/components/schemas/PacienteResumen' }
+                  total: { type: integer }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+    post:
+      tags: [Pacientes]
+      summary: Registra un paciente y abre su historial clínico
+      description: 'Roles: todos. Un menor de edad requiere al menos un representante.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PacienteEntrada' }
+      responses:
+        '201':
+          description: Paciente creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Paciente' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '409': { $ref: '#/components/responses/Duplicado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+  /api/pacientes/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Pacientes]
+      summary: Datos del paciente
+      description: 'Roles: todos.'
+      responses:
+        '200':
+          description: Paciente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Paciente' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Pacientes]
+      summary: Actualiza datos; las colecciones enviadas se reemplazan
+      description: 'Roles: todos. El estado solo cambia con /archivar.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PacienteEntrada' }
+      responses:
+        '200':
+          description: Paciente actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Paciente' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+  /api/pacientes/{id}/archivar:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    post:
+      tags: [Pacientes]
+      summary: Da de baja al paciente y archiva su historial
+      description: 'Roles: Administrador y profesionales de salud.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado, motivo]
+              properties:
+                estado: { type: string, enum: [Archivado, Inactivo] }
+                motivo: { type: string, maxLength: 255 }
+      responses:
+        '200':
+          description: Paciente archivado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Paciente' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+  /api/pacientes/{id}/historial:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Pacientes]
+      summary: Historial clínico completo
+      description: 'Roles: profesionales de salud.'
+      responses:
+        '200':
+          description: Historial
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  historial: { $ref: '#/components/schemas/Historial' }
+                  antecedentes:
+                    type: array
+                    items: { $ref: '#/components/schemas/Antecedente' }
+                  alergias:
+                    type: array
+                    items: { $ref: '#/components/schemas/Alergia' }
+                  consultas:
+                    type: array
+                    items: { $ref: '#/components/schemas/Consulta' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /api/pacientes/{id}/alergias:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Pacientes]
+      summary: Alergias del paciente
+      description: 'Roles: profesionales de salud.'
+      responses:
+        '200':
+          description: Alergias
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Alergia' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    post:
+      tags: [Pacientes]
+      summary: Agrega una alergia
+      description: 'Roles: profesionales de salud.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_catalogo_alergia]
+              properties:
+                id_catalogo_alergia: { type: string }
+                reaccion: { type: string, maxLength: 255 }
+                nivel_gravedad: { type: string, enum: [Leve, Moderada, Grave] }
+                observaciones: { type: string }
+      responses:
+        '201':
+          description: Alergia agregada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Alergia' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '409': { $ref: '#/components/responses/Duplicado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+  /api/pacientes/{id}/antecedentes:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    post:
+      tags: [Pacientes]
+      summary: Agrega un antecedente médico
+      description: 'Roles: profesionales de salud.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tipo_antecedente, descripcion]
+              properties:
+                tipo_antecedente: { type: string, enum: [Personal, Familiar, Quirúrgico, Patológico, Hereditario] }
+                descripcion: { type: string }
+                estado: { type: string, maxLength: 20 }
+                observaciones: { type: string }
+      responses:
+        '201':
+          description: Antecedente agregado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Antecedente' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+
+  /api/citas:
+    get:
+      tags: [Citas]
+      summary: Lista citas
+      description: 'Roles: todos.'
+      parameters:
+        - { name: id_paciente, in: query, schema: { type: string } }
+        - { name: id_usuario_profesional, in: query, schema: { type: string } }
+        - { name: estado, in: query, schema: { $ref: '#/components/schemas/EstadoCita' } }
+        - { name: desde, in: query, schema: { type: string, example: '2026-11-03T00:00:00' } }
+        - { name: hasta, in: query, schema: { type: string, example: '2026-11-03T23:59:59' } }
+      responses:
+        '200':
+          description: Citas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Cita' }
+    post:
+      tags: [Citas]
+      summary: Programa una cita
+      description: 'Roles: todos. Se rechaza si el paciente está Archivado o Inactivo.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_paciente, id_usuario_profesional, fecha_hora]
+              properties:
+                id_paciente: { type: string }
+                id_usuario_profesional: { type: string }
+                fecha_hora: { type: string, example: '2026-12-01T09:30:00' }
+                motivo_consulta: { type: string, maxLength: 255 }
+                observaciones: { type: string }
+      responses:
+        '201':
+          description: Cita creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cita' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Duplicado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+  /api/citas/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Citas]
+      summary: Datos de la cita
+      responses:
+        '200':
+          description: Cita
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cita' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Citas]
+      summary: Reprograma o cambia el estado de una cita
+      description: Una cita Atendida, Cancelada o No Asistió ya no se puede modificar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id_usuario_profesional: { type: string }
+                fecha_hora: { type: string }
+                motivo_consulta: { type: string, maxLength: 255 }
+                observaciones: { type: string }
+                estado: { $ref: '#/components/schemas/EstadoCita' }
+      responses:
+        '200':
+          description: Cita actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cita' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+
+  /api/consultas:
+    post:
+      tags: [Consultas]
+      summary: Registra consulta, signos, diagnósticos, tratamientos y receta como una unidad
+      description: >
+        Roles: profesionales de salud. El autor se toma del token. Si se envía id_cita, la cita
+        pasa a Atendida. Una consulta idéntica en un margen de 30 segundos produce 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConsultaEntrada' }
+      responses:
+        '201':
+          description: Consulta registrada, con advertencias de alergias si las hay
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConsultaConAdvertencias' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Duplicado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+        '503': { $ref: '#/components/responses/MotorNoDisponible' }
+  /api/consultas/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Consultas]
+      summary: Consulta con su detalle
+      description: 'Roles: profesionales de salud.'
+      responses:
+        '200':
+          description: Consulta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Consulta' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /api/consultas/{id}/estado:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    patch:
+      tags: [Consultas]
+      summary: Finaliza o anula una consulta
+      description: 'Roles: profesionales de salud. Transiciones: Abierta a Finalizada o Anulada; Finalizada a Anulada.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              properties:
+                estado: { type: string, enum: [Abierta, Finalizada, Anulada] }
+      responses:
+        '200':
+          description: Consulta actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Consulta' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+  /api/consultas/{id}/diagnosticos:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    post:
+      tags: [Consultas]
+      summary: Agrega un diagnóstico
+      description: 'Roles: profesionales de salud.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DiagnosticoEntrada' }
+      responses:
+        '201':
+          description: Consulta actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Consulta' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Duplicado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+  /api/consultas/{id}/tratamientos:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    post:
+      tags: [Consultas]
+      summary: Agrega un tratamiento
+      description: 'Roles: profesionales de salud.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TratamientoEntrada' }
+      responses:
+        '201':
+          description: Consulta actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Consulta' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+  /api/consultas/{id}/recetas:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    post:
+      tags: [Consultas]
+      summary: Agrega una receta
+      description: 'Roles: profesionales de salud.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecetaEntrada' }
+      responses:
+        '201':
+          description: Consulta actualizada, con advertencias de alergias si las hay
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConsultaConAdvertencias' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+
+  /api/catalogos/diagnosticos:
+    get:
+      tags: [Catálogos]
+      summary: Catálogo de diagnósticos
+      parameters:
+        - { name: texto, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Diagnósticos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id_catalogo_diag: { type: string }
+                    codigo_clinico: { type: string, nullable: true }
+                    nombre_diagnostico: { type: string }
+                    descripcion: { type: string, nullable: true }
+  /api/catalogos/medicamentos:
+    get:
+      tags: [Catálogos]
+      summary: Medicamentos activos
+      responses:
+        '200':
+          description: Medicamentos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id_medicamento: { type: string }
+                    nombre: { type: string }
+                    principio_activo: { type: string, nullable: true }
+                    presentacion: { type: string, nullable: true }
+                    concentracion: { type: string, nullable: true }
+  /api/catalogos/alergias:
+    get:
+      tags: [Catálogos]
+      summary: Catálogo de alergias
+      responses:
+        '200':
+          description: Alergias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id_catalogo_alergia: { type: string }
+                    sustancia: { type: string }
+                    tipo_alergia: { type: string, nullable: true }
+  /api/catalogos/profesionales:
+    get:
+      tags: [Catálogos]
+      summary: Profesionales activos de la institución
+      responses:
+        '200':
+          description: Profesionales
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id_usuario: { type: string }
+                    nombres: { type: string }
+                    apellidos: { type: string }
+                    rol: { type: string }
+
+  /health:
+    get:
+      tags: [Salud]
+      summary: El servidor está en marcha
+      security: []
+      responses:
+        '200': { description: 'Servidor activo' }
+  /health/motores:
+    get:
+      tags: [Salud]
+      summary: Estado de cada motor
+      security: []
+      responses:
+        '200':
+          description: Estado por institución
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  motores:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id_institucion: { type: integer }
+                        nombre: { type: string }
+                        motor: { type: string }
+                        estado: { type: string, enum: [disponible, no_disponible, no_implementado] }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Claims: sub (id_usuario), id_institucion, rol.'
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+  responses:
+    DatosInvalidos:
+      description: Datos inválidos
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoAutorizado:
+      description: Sin sesión o credenciales inválidas
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Prohibido:
+      description: El rol no tiene permiso
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoEncontrado:
+      description: El registro no existe
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Duplicado:
+      description: Registro o envío duplicado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ReglaNegocio:
+      description: La operación incumple una regla de negocio
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    MotorNoDisponible:
+      description: El motor de la institución no responde
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      required: [codigo, mensaje]
+      properties:
+        codigo:
+          type: string
+          enum: [DATOS_INVALIDOS, NO_AUTORIZADO, PROHIBIDO, NO_ENCONTRADO, REGISTRO_DUPLICADO, CONSULTA_DUPLICADA, REGLA_NEGOCIO, MOTOR_NO_DISPONIBLE, ERROR_INTERNO]
+        mensaje:
+          type: string
+          description: Texto listo para mostrarse al usuario
+          example: Servicio de Clínica Odontológica temporalmente no disponible.
+    EstadoPaciente:
+      type: string
+      enum: [Activo, Archivado, Inactivo]
+    EstadoCita:
+      type: string
+      enum: [Programada, Atendida, Cancelada, No Asistió]
+    Usuario:
+      type: object
+      properties:
+        id_usuario: { type: string }
+        id_institucion: { type: string }
+        nombres: { type: string }
+        apellidos: { type: string }
+        usuario: { type: string }
+        rol: { type: string, enum: [Administrador, Médico, Odontólogo, Secretaria, Laboratorista] }
+        estado: { type: string, enum: [Activo, Inactivo] }
+    Telefono:
+      type: object
+      required: [numero]
+      properties:
+        numero: { type: string, maxLength: 20 }
+        tipo: { type: string, nullable: true, description: 'Paciente: Celular, Casa o Trabajo. Contacto y representante: Celular o Casa.' }
+    Correo:
+      type: object
+      required: [correo]
+      properties:
+        correo: { type: string, maxLength: 100 }
+    ContactoEntrada:
+      type: object
+      required: [nombres, apellidos]
+      properties:
+        nombres: { type: string }
+        apellidos: { type: string }
+        parentesco: { type: string, nullable: true }
+        direccion: { type: string, nullable: true }
+        telefonos:
+          type: array
+          items: { $ref: '#/components/schemas/Telefono' }
+    RepresentanteEntrada:
+      type: object
+      required: [nombres, apellidos]
+      properties:
+        nombres: { type: string }
+        apellidos: { type: string }
+        dpi: { type: string, nullable: true }
+        parentesco: { type: string, nullable: true }
+        direccion: { type: string, nullable: true }
+        telefonos:
+          type: array
+          items: { $ref: '#/components/schemas/Telefono' }
+        correos:
+          type: array
+          items: { $ref: '#/components/schemas/Correo' }
+    PacienteEntrada:
+      type: object
+      required: [nombres, apellidos, fecha_nacimiento]
+      properties:
+        nombres: { type: string, maxLength: 100 }
+        apellidos: { type: string, maxLength: 100 }
+        dpi_o_documento: { type: string, maxLength: 50, nullable: true }
+        fecha_nacimiento: { type: string, example: '1990-05-20' }
+        sexo: { type: string, enum: [M, F, O], nullable: true }
+        direccion: { type: string, maxLength: 200, nullable: true }
+        estado_civil: { type: string, maxLength: 50, nullable: true }
+        ocupacion: { type: string, maxLength: 100, nullable: true }
+        tipo_sangre: { type: string, enum: [A+, A-, B+, B-, AB+, AB-, O+, O-], nullable: true }
+        telefonos:
+          type: array
+          items: { $ref: '#/components/schemas/Telefono' }
+        correos:
+          type: array
+          items: { $ref: '#/components/schemas/Correo' }
+        contactos_emergencia:
+          type: array
+          items: { $ref: '#/components/schemas/ContactoEntrada' }
+        representantes:
+          type: array
+          items: { $ref: '#/components/schemas/RepresentanteEntrada' }
+    PacienteResumen:
+      type: object
+      properties:
+        id_paciente: { type: string }
+        id_historial: { type: string }
+        codigo_historial: { type: string }
+        nombres: { type: string }
+        apellidos: { type: string }
+        dpi_o_documento: { type: string, nullable: true }
+        fecha_nacimiento: { type: string }
+        sexo: { type: string, nullable: true }
+        direccion: { type: string, nullable: true }
+        estado_civil: { type: string, nullable: true }
+        ocupacion: { type: string, nullable: true }
+        tipo_sangre: { type: string, nullable: true }
+        fecha_registro: { type: string }
+        estado: { $ref: '#/components/schemas/EstadoPaciente' }
+        motivo_baja: { type: string, nullable: true }
+    Paciente:
+      allOf:
+        - { $ref: '#/components/schemas/PacienteResumen' }
+        - type: object
+          properties:
+            telefonos:
+              type: array
+              items: { $ref: '#/components/schemas/Telefono' }
+            correos:
+              type: array
+              items: { $ref: '#/components/schemas/Correo' }
+            contactos_emergencia:
+              type: array
+              items:
+                allOf:
+                  - { $ref: '#/components/schemas/ContactoEntrada' }
+                  - type: object
+                    properties:
+                      id_contacto: { type: string }
+            representantes:
+              type: array
+              items:
+                allOf:
+                  - { $ref: '#/components/schemas/RepresentanteEntrada' }
+                  - type: object
+                    properties:
+                      id_representante: { type: string }
+    Historial:
+      type: object
+      properties:
+        id_historial: { type: string }
+        id_paciente: { type: string }
+        id_institucion: { type: string }
+        codigo_historial: { type: string }
+        fecha_apertura: { type: string }
+        estado: { type: string, enum: [Activo, Archivado] }
+        fecha_cierre: { type: string, nullable: true }
+        motivo_cierre: { type: string, nullable: true }
+        observaciones: { type: string, nullable: true }
+    Antecedente:
+      type: object
+      properties:
+        id_antecedente: { type: string }
+        tipo_antecedente: { type: string }
+        descripcion: { type: string }
+        fecha_registro: { type: string }
+        estado: { type: string, nullable: true }
+        observaciones: { type: string, nullable: true }
+    Alergia:
+      type: object
+      properties:
+        id_catalogo_alergia: { type: string }
+        sustancia: { type: string }
+        tipo_alergia: { type: string, nullable: true }
+        reaccion: { type: string, nullable: true }
+        nivel_gravedad: { type: string, nullable: true }
+        fecha_registro: { type: string }
+        observaciones: { type: string, nullable: true }
+    Cita:
+      type: object
+      properties:
+        id_cita: { type: string }
+        id_paciente: { type: string }
+        id_institucion: { type: string }
+        id_usuario_profesional: { type: string }
+        fecha_hora: { type: string }
+        motivo_consulta: { type: string, nullable: true }
+        estado: { $ref: '#/components/schemas/EstadoCita' }
+        observaciones: { type: string, nullable: true }
+        fecha_creacion: { type: string }
+    DiagnosticoEntrada:
+      type: object
+      required: [id_catalogo_diag]
+      properties:
+        id_catalogo_diag: { type: string }
+        tipo: { type: string, enum: [Presuntivo, Definitivo, Seguimiento], nullable: true }
+        observaciones: { type: string, nullable: true }
+    TratamientoEntrada:
+      type: object
+      required: [descripcion]
+      properties:
+        descripcion: { type: string }
+        fecha_inicio: { type: string, description: 'Por defecto, hoy.' }
+        fecha_fin: { type: string, nullable: true }
+        indicaciones: { type: string, nullable: true }
+        estado: { type: string, enum: [Activo, Finalizado, Suspendido], description: 'Por defecto, Activo.' }
+    RecetaEntrada:
+      type: object
+      required: [detalles]
+      properties:
+        fecha_receta: { type: string, description: 'Por defecto, hoy.' }
+        indicaciones_generales: { type: string, nullable: true }
+        detalles:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [id_medicamento, dosis, frecuencia]
+            properties:
+              id_medicamento: { type: string }
+              dosis: { type: string, maxLength: 100 }
+              frecuencia: { type: string, maxLength: 100 }
+              via_administracion: { type: string, maxLength: 50, nullable: true }
+              duracion: { type: string, maxLength: 50, nullable: true }
+              indicaciones_especificas: { type: string, nullable: true }
+    SignosVitales:
+      type: object
+      properties:
+        presion_arterial: { type: string, nullable: true }
+        temperatura: { type: number, nullable: true }
+        frecuencia_cardiaca: { type: integer, nullable: true }
+        frecuencia_respiratoria: { type: integer, nullable: true }
+        peso: { type: number, nullable: true }
+        talla: { type: number, nullable: true }
+        saturacion_oxigeno: { type: integer, nullable: true }
+    ConsultaEntrada:
+      type: object
+      required: [id_paciente]
+      properties:
+        id_paciente: { type: string }
+        id_cita: { type: string, nullable: true }
+        fecha_hora: { type: string, description: 'Por defecto, ahora.' }
+        motivo_consulta: { type: string, maxLength: 255, nullable: true }
+        sintomas: { type: string, nullable: true }
+        examen_fisico: { type: string, nullable: true }
+        notas_clinicas: { type: string, nullable: true }
+        estado: { type: string, enum: [Abierta, Finalizada], description: 'Por defecto, Abierta.' }
+        signos_vitales: { $ref: '#/components/schemas/SignosVitales' }
+        diagnosticos:
+          type: array
+          items: { $ref: '#/components/schemas/DiagnosticoEntrada' }
+        tratamientos:
+          type: array
+          items: { $ref: '#/components/schemas/TratamientoEntrada' }
+        receta: { $ref: '#/components/schemas/RecetaEntrada' }
+    Consulta:
+      type: object
+      properties:
+        id_consulta: { type: string }
+        id_historial: { type: string }
+        id_paciente: { type: string }
+        id_cita: { type: string, nullable: true }
+        id_usuario_profesional: { type: string }
+        fecha_hora: { type: string }
+        motivo_consulta: { type: string, nullable: true }
+        sintomas: { type: string, nullable: true }
+        examen_fisico: { type: string, nullable: true }
+        notas_clinicas: { type: string, nullable: true }
+        estado: { type: string, enum: [Abierta, Finalizada, Anulada] }
+        signos_vitales:
+          allOf:
+            - { $ref: '#/components/schemas/SignosVitales' }
+          nullable: true
+        diagnosticos:
+          type: array
+          items:
+            type: object
+            properties:
+              id_catalogo_diag: { type: string }
+              codigo_clinico: { type: string, nullable: true }
+              nombre_diagnostico: { type: string }
+              tipo: { type: string, nullable: true }
+              fecha_registro: { type: string }
+              observaciones: { type: string, nullable: true }
+        tratamientos:
+          type: array
+          items:
+            allOf:
+              - { $ref: '#/components/schemas/TratamientoEntrada' }
+              - type: object
+                properties:
+                  id_tratamiento: { type: string }
+        recetas:
+          type: array
+          items:
+            type: object
+            properties:
+              id_receta: { type: string }
+              fecha_receta: { type: string }
+              indicaciones_generales: { type: string, nullable: true }
+              detalles:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id_detalle_receta: { type: string }
+                    id_medicamento: { type: string }
+                    nombre_medicamento: { type: string }
+                    dosis: { type: string }
+                    frecuencia: { type: string }
+                    via_administracion: { type: string, nullable: true }
+                    duracion: { type: string, nullable: true }
+                    indicaciones_especificas: { type: string, nullable: true }
+    ConsultaConAdvertencias:
+      type: object
+      properties:
+        consulta: { $ref: '#/components/schemas/Consulta' }
+        advertencias:
+          type: array
+          description: Alergias del paciente relacionadas con lo recetado. Avisan, no bloquean.
+          items: { type: string }

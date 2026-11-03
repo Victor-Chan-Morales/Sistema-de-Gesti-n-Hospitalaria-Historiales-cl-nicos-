@@ -8,8 +8,8 @@ Proyecto universitario (Universidad Rafael Landívar, Bases de Datos II): una pl
 
 | Institución | Motor | Archivo en el repositorio |
 |---|---|---|
-| Hospital General | PostgreSQL | `hospital_general.sql` |
-| Clínica Odontológica | MySQL | `clinica_odontologica.sql` |
+| Hospital General | PostgreSQL | `backend/db/postgres/01-hospital_general.sql` |
+| Clínica Odontológica | MySQL | `backend/db/mysql/01-clinica_odontologica.sql` |
 | Laboratorio Clínico | MongoDB | aún no creado |
 | Centro Médico Pediátrico | Firebase (Firestore) | aún no creado |
 
@@ -22,18 +22,26 @@ Leerlos con `pdftotext -layout <archivo> -` cuando haya dudas sobre los requisit
 
 ## Estado actual
 
-Todavía no hay código de aplicación, repositorio git ni herramientas de build o pruebas. Los únicos archivos ejecutables son los dos scripts DDL.
-
-Cargar los esquemas (los scripts solo contienen `CREATE TABLE`; no tienen `CREATE DATABASE`, `USE` ni `DROP`, así que deben ejecutarse sobre una base de datos nueva y vacía):
+El núcleo hexagonal y los adaptadores de PostgreSQL y MySQL están implementados (Integrante A). MongoDB y Firebase están pendientes (Integrante B): `factory/repositoryFactory.js` los resuelve con un stub que responde 503. La guía para implementarlos está en `docs/guia-integrante-b.md`.
 
 ```bash
-createdb hospital_general && psql -d hospital_general -f hospital_general.sql
-mysql -e "CREATE DATABASE clinica_odontologica" && mysql clinica_odontologica < clinica_odontologica.sql
+cp .env.example .env                 # completar las variables
+docker compose up -d postgres mysql  # carga los SQL solo si el volumen es nuevo
+cd backend && npm install
+npm run seed                         # repetible
+npm start                            # http://localhost:3000, docs en /api/docs
+npm test                             # unitarias y arquitectura, sin Docker
+npm run test:integracion             # contrato y equivalencia; requiere bases y seed
+node --test --test-name-pattern="<patrón>" tests/unit/http.test.js   # una sola prueba
 ```
+
+Regla de dependencias: `adapters → application → domain`. El dominio, los puertos y los casos de uso no importan drivers ni Express (`tests/arquitectura.test.js` lo verifica). `factory/` y `server.js` son los únicos puntos que conectan adaptadores.
+
+Cualquier cambio al puerto (`ports/repositorioClinico.js`) debe reflejarse en todos los adaptadores, en `tests/unit/apoyo/repoMemoria.js` y en `tests/contrato/suiteRepositorio.js`. Los repositorios de PostgreSQL y MySQL son casi idénticos a propósito: al corregir uno, revisar el otro.
 
 ## Arquitectura del esquema
 
-Ambos scripts SQL comparten una **sección común** idéntica ("ENTIDADES GENERALES"): `Institucion`, `Usuario`, `Paciente`, `Historial_Clinico`, `Cita`, `Consulta`, `Signos_Vitales`, diagnósticos (`Catalogo_Diagnostico` / `Diagnostico_Consulta`), `Tratamiento`, `Receta` / `Detalle_Receta` / `Medicamento`, alergias, antecedentes, contactos de emergencia y representantes. Los teléfonos y correos (multivaluados) están normalizados en tablas `Telefono_*` / `Correo_*` separadas por cada entidad propietaria.
+Ambos scripts SQL (`backend/db/`) comparten una **sección común** idéntica ("ENTIDADES GENERALES"): `Institucion`, `Usuario`, `Paciente`, `Historial_Clinico`, `Cita`, `Consulta`, `Signos_Vitales`, diagnósticos (`Catalogo_Diagnostico` / `Diagnostico_Consulta`), `Tratamiento`, `Receta` / `Detalle_Receta` / `Medicamento`, alergias, antecedentes, contactos de emergencia, representantes y `Auditoria`. Los teléfonos y correos (multivaluados) están normalizados en tablas `Telefono_*` / `Correo_*` separadas por cada entidad propietaria.
 
 Después, cada script agrega **tablas específicas de su institución**:
 - Hospital (PostgreSQL): `Especialidad_Medica`, `Usuario_Especialidad`, `Habitacion`, `Hospitalizacion`, `Hospitalizacion_Habitacion`.
@@ -45,9 +53,11 @@ Las diferencias de dialecto entre las dos copias de la sección común son mecá
 
 Cualquier cambio a una tabla común debe aplicarse en ambos archivos (y, más adelante, reflejarse en los modelos documentales de MongoDB/Firebase y en los DTOs).
 
+El script de MySQL debe conservar `SET NAMES utf8mb4` al inicio: sin esto, los `ENUM` con acentos se corrompen al cargarlo.
+
 Regla de negocio clave incluida en el modelo: `Paciente.estado` (Activo / Archivado / Inactivo) junto con `motivo_baja`; los pacientes archivados o inactivos no pueden recibir citas nuevas.
 
-## Arquitectura planificada para la Entrega II (según la propuesta)
+## Arquitectura de la Entrega II (según la propuesta)
 
 - **Backend**: Node.js + Express con arquitectura hexagonal (dominio, puertos, adaptadores). Librerías: `pg`, `mysql2`, `mongodb`, `firebase-admin`, `jsonwebtoken`, `bcrypt`, `dotenv`.
 - **Frontend**: HTML + Tailwind (CDN) + JavaScript vanilla con `fetch`. La interfaz no debe cambiar según el motor activo.
