@@ -435,7 +435,7 @@ async function detalleConsulta(contenedor, id) {
       <section class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
         <div class="flex items-center justify-between mb-3">
           <h2 class="font-semibold text-gray-800">Diagnósticos</h2>
-          ${puedeRegistrar && consultaActual.estado === 'Abierta' ? '<button type="button" data-agregar-diagnostico class="text-sm text-blue-600 hover:text-blue-800">Agregar</button>' : ''}
+          ${puedeRegistrar && consultaActual.estado !== 'Anulada' ? '<button type="button" data-agregar-diagnostico class="text-sm text-blue-600 hover:text-blue-800">Agregar</button>' : ''}
         </div>
         ${(consultaActual.diagnosticos ?? []).length === 0
           ? '<p class="text-sm text-gray-400">Sin diagnósticos.</p>'
@@ -450,7 +450,7 @@ async function detalleConsulta(contenedor, id) {
       <section class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
         <div class="flex items-center justify-between mb-3">
           <h2 class="font-semibold text-gray-800">Tratamientos</h2>
-          ${puedeRegistrar && consultaActual.estado === 'Abierta' ? '<button type="button" data-agregar-tratamiento class="text-sm text-blue-600 hover:text-blue-800">Agregar</button>' : ''}
+          ${puedeRegistrar && consultaActual.estado !== 'Anulada' ? '<button type="button" data-agregar-tratamiento class="text-sm text-blue-600 hover:text-blue-800">Agregar</button>' : ''}
         </div>
         ${(consultaActual.tratamientos ?? []).length === 0
           ? '<p class="text-sm text-gray-400">Sin tratamientos.</p>'
@@ -466,7 +466,7 @@ async function detalleConsulta(contenedor, id) {
       <section class="bg-white rounded-lg border border-gray-200 p-4">
         <div class="flex items-center justify-between mb-3">
           <h2 class="font-semibold text-gray-800">Recetas</h2>
-          ${puedeRegistrar && consultaActual.estado === 'Abierta' ? '<button type="button" data-agregar-receta class="text-sm text-blue-600 hover:text-blue-800">Nueva receta</button>' : ''}
+          ${puedeRegistrar && consultaActual.estado !== 'Anulada' ? '<button type="button" data-agregar-receta class="text-sm text-blue-600 hover:text-blue-800">Nueva receta</button>' : ''}
         </div>
         ${(consultaActual.recetas ?? []).length === 0
           ? '<p class="text-sm text-gray-400">Sin recetas.</p>'

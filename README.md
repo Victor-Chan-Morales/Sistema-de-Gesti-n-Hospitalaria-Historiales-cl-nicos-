@@ -15,7 +15,7 @@ Proyecto final de Bases de Datos II (Universidad Rafael Landívar). Plataforma c
 |---|---|---|
 | A: núcleo del backend, autenticación, PostgreSQL y MySQL | Victor | Implementada |
 | B: MongoDB, Firebase, modelo documental y comparativo | Integrante B | Implementada: [detalles](#integrante-b-mongodb-y-firebase) |
-| C: pantallas, integración y pruebas | Integrante C | Por empezar: [instrucciones](#integrante-c-frontend-y-qa) |
+| C: pantallas, integración y pruebas | Integrante C | Implementada: [detalles](#integrante-c-frontend-y-qa) |
 
 ### Lo implementado hasta el momento
 
@@ -34,6 +34,12 @@ Proyecto final de Bases de Datos II (Universidad Rafael Landívar). Plataforma c
 - Consultas: consulta, signos vitales, diagnósticos, tratamientos y receta se guardan como una unidad. También se pueden agregar datos a una consulta existente, finalizarla o anularla.
 - Catálogos de diagnósticos, medicamentos, alergias y profesionales.
 
+**Interfaz (Parte C)**
+- Login y panel SPA servidos por Express en el mismo origen (sin CORS), en HTML + Tailwind CDN + JavaScript vanilla.
+- La navegación se arma con la matriz de permisos: la secretaria no ve formularios clínicos y el administrador no ve el historial. Las pantallas de laboratorio y pediatría solo aparecen en su institución.
+- `api.js` guarda el token del login, lo envía en cada petición y vuelve al login al expirar. El 503 de un motor caído se muestra como aviso, sin romper la vista; el 409 de doble envío, como aviso con deshabilitado del botón.
+- Vistas comunes a los cuatro motores y pantallas propias del laboratorio y del centro pediátrico; detalles en [`docs/10-frontend.md`](docs/10-frontend.md).
+
 **Funciones propias de cada institución**
 - Laboratorio (MongoDB): órdenes de examen y resultados de estructura variable. El resultado y el estado de su orden se guardan como una unidad.
 - Centro Pediátrico (Firebase): controles de crecimiento y registro de vacunación.
@@ -49,7 +55,6 @@ Proyecto final de Bases de Datos II (Universidad Rafael Landívar). Plataforma c
 
 ### Lo que aún no está
 
-- Pantallas: `frontend/` solo tiene el formulario de login sin conectar y un panel vacío (C).
 - Hospitalización y odontograma: las tablas de hospital y clínica existen, pero aún no tienen endpoints.
 - Límite de intentos fallidos en el login. Además, un token sigue siendo válido hasta expirar, aunque se desactive al usuario.
 
@@ -114,7 +119,7 @@ backend/src/
 backend/db/      esquemas SQL y seeder
 backend/tests/   unit/, contrato/ e integracion/
 docs/            modelos, API, seguridad, comparativo y decisiones
-frontend/        HTML + Tailwind (CDN) + JavaScript vanilla
+frontend/        HTML + Tailwind (CDN) + JavaScript vanilla: js/ (api, sesión, utilidades, panel) y js/vistas/ (una por pantalla)
 ```
 
 Una petición entra por `adapters/http`, donde el JWT indica la institución. El factory entrega el repositorio de ese motor, el caso de uso aplica las reglas y el DTO responde con el mismo JSON para todos.
@@ -158,24 +163,23 @@ Puntos importantes:
 
 ## Integrante C: frontend y QA
 
-La interfaz no debe cambiar según el motor. Express sirve `frontend/` en <http://localhost:3000>, así que no hay que configurar CORS. Prueba siempre desde esa dirección.
+Implementada. La interfaz consume la API con el contrato único de `docs/06-api-contratos.md` y no cambia según el motor: misma pantalla para PostgreSQL, MySQL, MongoDB o Firebase. La arquitectura del frontend y el plan de pruebas detallado están en [`docs/10-frontend.md`](docs/10-frontend.md).
 
-1. Levanta el backend con las instrucciones de [Cómo levantarlo](#cómo-levantarlo).
-2. Revisa los contratos en [`docs/06-api-contratos.md`](docs/06-api-contratos.md) y prueba los endpoints en `/api/docs`.
-3. Conecta `frontend/js/api.js` al token: hoy no envía el encabezado `Authorization`. Guarda el token que devuelve `POST /api/auth/login` y envíalo como `Authorization: Bearer <token>`. Ante un 401, regresa al login.
-4. Construye las pantallas: login, búsqueda y registro de pacientes, historial, citas y registro de consulta.
-5. Adapta la interfaz al rol que devuelve el login, según la [matriz de permisos](docs/07-seguridad.md#control-de-acceso-por-roles). Por ejemplo, una secretaria no debe ver los formularios clínicos.
+- **Panel SPA** (`dashboard.html`) con navegación por hash y `frontend/js/vistas/` con una vista por pantalla: pacientes, citas, historial, consultas, laboratorio y pediatría. Solo entran al contenedor las vistas que el rol puede usar.
+- **Permisos por rol** (`js/sesion.js`), espejo de la matriz del backend: secretaria sin formularios clínicos, administrador sin historial, profesional con todo lo clínico.
+- **Sesión y token**: `POST /api/auth/login` guarda token y usuario; `js/api.js` envía `Authorization: Bearer` en cada petición y ante un 401 limpia la sesión y vuelve al login con aviso de expiración.
+- **Errores y estados**: `ApiError` conserva el estado HTTP. Un 503 de motor caído se muestra como aviso, sin romper la vista; el 409 de doble envío llega con el botón ya deshabilitado; las `advertencias` de alergias se muestran en un aviso destacado.
+- **Datos del contrato**: ids como texto, fechas `YYYY-MM-DD` y `YYYY-MM-DDTHH:MM:SS` en hora local.
 
-Puntos importantes:
-- **Errores:** toda respuesta de error trae `{ codigo, mensaje }`, y `mensaje` está listo para mostrarse. Un 503 significa que el motor de esa institución no responde; muéstralo como aviso, sin romper la pantalla. `api.js` ya lanza ese mensaje como `Error`, pero no conserva el estado HTTP: tendrás que agregarlo para distinguir un 401.
-- **Advertencias:** `POST /api/consultas` y `POST /api/consultas/:id/recetas` devuelven `advertencias`, con alergias relacionadas a lo recetado. Hay que mostrarlas de forma visible.
-- **Datos:** trata los IDs como texto, porque Mongo y Firebase no usan números. Envía las fechas como `YYYY-MM-DD` y `YYYY-MM-DDTHH:MM:SS`.
-- **Doble clic:** un 409 indica un envío duplicado. Desactiva el botón mientras se guarda.
+Para probarlo:
 
-Para QA:
-- Prueba los flujos completos con cada institución y rol, y confirma que la interfaz sea idéntica.
-- Simula una caída con `docker compose stop mysql`: la clínica debe mostrar el aviso y el hospital debe seguir funcionando.
-- Repite todo con el laboratorio y el centro pediátrico. Sus pantallas propias (órdenes y resultados, controles y vacunas) usan `/api/laboratorio` y `/api/pediatria`, documentados en `/api/docs`.
+```bash
+docker compose up -d postgres mysql mongo firestore
+cd backend && npm run seed && npm run seed:nosql
+npm start
+```
+
+Abre <http://localhost:3000> e inicia sesión con los usuarios de la tabla de arriba. QA ejecutado: 92 verificaciones de flujo contra los cuatro motores (login de los 12 usuarios, pacientes, citas, consultas con advertencias, órdenes y resultados, controles y vacunas, permisos 403, reglas 422 y duplicados 409), caída de MySQL con el hospital operativo y `npm test` en verde (124 pruebas). El recorrido manual sugerido para la entrega está al final de [`docs/10-frontend.md`](docs/10-frontend.md).
 
 ## Documentación
 
@@ -187,5 +191,6 @@ Para QA:
 - [Comparativo de motores](docs/08-comparativo.md)
 - [Decisiones de arquitectura](docs/decisiones/)
 - [Guía de los motores NoSQL](docs/guia-integrante-b.md)
+- [Frontend y manual de pruebas](docs/10-frontend.md)
 
 Aún sin redactar: `docs/01-requisitos.md` y `docs/05-operaciones.md`.
