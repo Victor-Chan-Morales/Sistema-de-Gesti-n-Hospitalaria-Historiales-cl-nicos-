@@ -13,88 +13,67 @@ async function vistaHistorial(contenedor, params) {
   const estado = { paciente: null, historial: null, antecedentes: [], alergias: [], consultas: [] };
 
   contenedor.innerHTML = `
-    <h1 class="text-xl font-semibold text-gray-800 mb-4">Historial clínico</h1>
-    <div class="bg-white border border-gray-200 rounded-lg p-4 mb-4" data-espacio-selector></div>
+    ${encabezadoHtml('Historial clínico', { descripcion: 'Alergias, antecedentes y consultas del paciente en tu institución.' })}
+    <div class="max-w-2xl mb-6" data-espacio-selector></div>
     <div data-zona-historial></div>`;
+
+  const lista = (elementos, vacio, fila) => (elementos.length === 0
+    ? `<p class="text-gray-600 py-2">${esc(vacio)}</p>`
+    : `<ul class="divide-y divide-gray-200 border-y border-gray-200">${elementos.map((e) => `<li class="py-3">${fila(e)}</li>`).join('')}</ul>`);
 
   const pintar = () => {
     const zona = contenedor.querySelector('[data-zona-historial]');
     if (!estado.paciente) {
-      zona.innerHTML = '<p class="text-sm text-gray-500 py-6 text-center">Busca y elige un paciente para ver su historial.</p>';
+      zona.innerHTML = vacioHtml('Elige un paciente', ' Búscalo por nombre o documento para abrir su historial.');
       return;
     }
 
     const h = estado.historial ?? {};
+    const activo = estado.paciente.estado === 'Activo';
+    const acciones = puedeRegistrar && activo
+      ? `<a href="#/consultas?paciente=${encodeURIComponent(estado.paciente.id_paciente)}" class="btn btn-primario">Nueva consulta</a>` : '';
     zona.innerHTML = `
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-2 mb-4">
-        <div class="bg-white border border-gray-200 rounded-lg p-4">
-          <p class="text-xs text-gray-500">Paciente</p>
-          <p class="font-medium text-gray-800">${esc(estado.paciente.nombres)} ${esc(estado.paciente.apellidos)}</p>
-          <p class="text-sm text-gray-500">${edadComoTexto(estado.paciente.fecha_nacimiento)} · ${o(estado.paciente.dpi_o_documento)}</p>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-lg p-4">
-          <p class="text-xs text-gray-500">Historial</p>
-          <p class="font-mono text-sm text-gray-800">${o(h.codigo_historial)} ${insignia(h.estado ?? 'Activo')}</p>
-          <p class="text-sm text-gray-500">Abierto el ${fechaLarga(h.fecha_apertura)}</p>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-lg p-4">
-          <p class="text-xs text-gray-500">Cierre</p>
-          <p class="text-sm text-gray-800">${h.fecha_cierre ? fechaLarga(h.fecha_cierre) : 'Abierto'}</p>
-          ${h.motivo_cierre ? `<p class="text-sm text-gray-500">${esc(h.motivo_cierre)}</p>` : ''}
-          ${h.observaciones ? `<p class="text-sm text-gray-500">${esc(h.observaciones)}</p>` : ''}
-        </div>
+      ${fichaPacienteHtml(estado.paciente, { alergias: estado.alergias, acciones, codigo: h.codigo_historial })}
+      <p class="text-sm text-gray-600 -mt-4 mb-6">
+        Historial ${esc((h.estado ?? 'Activo').toLowerCase())}, abierto el ${fechaLarga(h.fecha_apertura)}${h.fecha_cierre ? `; cerrado el ${fechaLarga(h.fecha_cierre)}${h.motivo_cierre ? ` por ${esc(h.motivo_cierre)}` : ''}` : ''}.
+        ${h.observaciones ? esc(h.observaciones) : ''}
+      </p>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-10">
+        <section class="mb-8">
+          <div class="seccion-cabeza">
+            <h2 class="titulo-seccion">Alergias</h2>
+            ${puedeRegistrar && activo ? '<button type="button" data-agregar-alergia class="enlace">Registrar alergia</button>' : ''}
+          </div>
+          ${lista(estado.alergias, 'Sin alergias registradas.', (a) => `
+            <div class="flex items-baseline justify-between gap-3">
+              <p class="font-bold">${esc(a.sustancia)} ${a.tipo_alergia ? `<span class="font-normal text-gray-600">(${esc(a.tipo_alergia)})</span>` : ''}</p>
+              ${a.nivel_gravedad ? insignia(a.nivel_gravedad) : ''}
+            </div>
+            ${a.reaccion ? `<p class="text-gray-700">Reacción: ${esc(a.reaccion)}</p>` : ''}
+            ${a.observaciones ? `<p class="text-sm text-gray-600">${esc(a.observaciones)}</p>` : ''}
+            <p class="text-sm text-gray-500">Registrada el ${fechaLarga(a.fecha_registro)}</p>`)}
+        </section>
+
+        <section class="mb-8">
+          <div class="seccion-cabeza">
+            <h2 class="titulo-seccion">Antecedentes</h2>
+            ${puedeRegistrar && activo ? '<button type="button" data-agregar-antecedente class="enlace">Registrar antecedente</button>' : ''}
+          </div>
+          ${lista(estado.antecedentes, 'Sin antecedentes registrados.', (a) => `
+            <div class="flex items-baseline justify-between gap-3">
+              <p><span class="text-gray-600">${esc(a.tipo_antecedente)}:</span> <span class="font-bold">${esc(a.descripcion)}</span></p>
+              ${a.estado ? `<span class="text-sm text-gray-600 whitespace-nowrap">${esc(a.estado)}</span>` : ''}
+            </div>
+            ${a.observaciones ? `<p class="text-sm text-gray-600">${esc(a.observaciones)}</p>` : ''}
+            <p class="text-sm text-gray-500">Registrado el ${fechaLarga(a.fecha_registro)}</p>`)}
+        </section>
       </div>
 
-      <section class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold text-gray-800">Alergias</h2>
-          ${puedeRegistrar ? '<button type="button" data-agregar-alergia class="text-sm text-blue-600 hover:text-blue-800">Agregar alergia</button>' : ''}
-        </div>
-        ${estado.alergias.length === 0
-          ? '<p class="text-sm text-gray-400">Sin alergias registradas.</p>'
-          : `<div class="overflow-x-auto"><table class="w-full text-sm">
-              <thead><tr class="text-left text-xs uppercase text-gray-500 border-b bg-gray-50">
-                <th class="px-3 py-2">Sustancia</th><th class="px-3 py-2">Tipo</th><th class="px-3 py-2">Reacción</th>
-                <th class="px-3 py-2">Gravedad</th><th class="px-3 py-2">Observaciones</th><th class="px-3 py-2">Registro</th>
-              </tr></thead>
-              <tbody>${estado.alergias.map((a) => `
-                <tr class="border-b last:border-0">
-                  <td class="px-3 py-2 font-medium text-gray-800">${esc(a.sustancia)}</td>
-                  <td class="px-3 py-2">${o(a.tipo_alergia)}</td>
-                  <td class="px-3 py-2">${o(a.reaccion)}</td>
-                  <td class="px-3 py-2">${a.nivel_gravedad ? insignia(a.nivel_gravedad) : '—'}</td>
-                  <td class="px-3 py-2 max-w-52 truncate">${o(a.observaciones)}</td>
-                  <td class="px-3 py-2 whitespace-nowrap text-gray-500">${fechaLarga(a.fecha_registro)}</td>
-                </tr>`).join('')}</tbody>
-            </table></div>`}
-      </section>
-
-      <section class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold text-gray-800">Antecedentes</h2>
-          ${puedeRegistrar ? '<button type="button" data-agregar-antecedente class="text-sm text-blue-600 hover:text-blue-800">Agregar antecedente</button>' : ''}
-        </div>
-        ${estado.antecedentes.length === 0
-          ? '<p class="text-sm text-gray-400">Sin antecedentes registrados.</p>'
-          : `<div class="overflow-x-auto"><table class="w-full text-sm">
-              <thead><tr class="text-left text-xs uppercase text-gray-500 border-b bg-gray-50">
-                <th class="px-3 py-2">Tipo</th><th class="px-3 py-2">Descripción</th>
-                <th class="px-3 py-2">Estado</th><th class="px-3 py-2">Observaciones</th><th class="px-3 py-2">Registro</th>
-              </tr></thead>
-              <tbody>${estado.antecedentes.map((a) => `
-                <tr class="border-b last:border-0">
-                  <td class="px-3 py-2">${esc(a.tipo_antecedente)}</td>
-                  <td class="px-3 py-2 font-medium text-gray-800">${esc(a.descripcion)}</td>
-                  <td class="px-3 py-2">${o(a.estado)}</td>
-                  <td class="px-3 py-2 max-w-52 truncate">${o(a.observaciones)}</td>
-                  <td class="px-3 py-2 whitespace-nowrap text-gray-500">${fechaLarga(a.fecha_registro)}</td>
-                </tr>`).join('')}</tbody>
-            </table></div>`}
-      </section>
-
-      <section class="bg-white rounded-lg border border-gray-200 p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold text-gray-800">Consultas</h2>
+      <section>
+        <div class="seccion-cabeza">
+          <h2 class="titulo-seccion">Consultas</h2>
+          <span class="seccion-nota">${estado.consultas.length} en total</span>
         </div>
         ${tablaConsultasHtml(estado.consultas)}
       </section>`;
@@ -112,7 +91,7 @@ async function vistaHistorial(contenedor, params) {
       return;
     }
     const zona = contenedor.querySelector('[data-zona-historial]');
-    zona.innerHTML = '<p class="text-sm text-gray-500 py-6 text-center">Cargando historial...</p>';
+    zona.innerHTML = cargandoHtml('Cargando historial...');
     try {
       const respuesta = await api.obtener(`/api/pacientes/${encodeURIComponent(paciente.id_paciente)}/historial`);
       estado.historial = respuesta.historial;
@@ -141,8 +120,8 @@ async function vistaHistorial(contenedor, params) {
 
 async function modalAgregarAlergia(estado, alRecargar) {
   const catalogo = await api.obtener('/api/catalogos/alergias');
-  const capa = abrirModal('Agregar alergia', `
-    <div class="space-y-3">
+  const capa = abrirModal('Registrar alergia', `
+    <div class="space-y-4">
       <label class="block">
         <span class="${ETIQUETA}">Alergia del catálogo *</span>
         <select data-alergia required class="${CAMPO_TEXTO}">
@@ -164,10 +143,7 @@ async function modalAgregarAlergia(estado, alRecargar) {
         <span class="${ETIQUETA}">Observaciones</span>
         <textarea data-observaciones rows="2" class="${CAMPO_TEXTO}"></textarea>
       </label>
-      <div class="flex justify-end gap-2">
-        <button type="button" data-cancelar class="px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-        <button type="button" data-guardar class="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">Agregar</button>
-      </div>
+      ${pieModalHtml('Registrar')}
     </div>`);
 
   capa.querySelector('[data-cancelar]').addEventListener('click', cerrarModal);
@@ -183,7 +159,7 @@ async function modalAgregarAlergia(estado, alRecargar) {
       await conCarga(evento.currentTarget, async () => {
         await api.crear(`/api/pacientes/${encodeURIComponent(estado.paciente.id_paciente)}/alergias`, cuerpo);
         cerrarModal();
-        avisar('Alergia agregada.');
+        avisar('Alergia registrada.');
         await alRecargar(estado.paciente);
       });
     } catch (error) {
@@ -193,8 +169,8 @@ async function modalAgregarAlergia(estado, alRecargar) {
 }
 
 function modalAgregarAntecedente(estado, alRecargar) {
-  const capa = abrirModal('Agregar antecedente', `
-    <div class="space-y-3">
+  const capa = abrirModal('Registrar antecedente', `
+    <div class="space-y-4">
       <label class="block">
         <span class="${ETIQUETA}">Tipo *</span>
         <select data-tipo required class="${CAMPO_TEXTO}">
@@ -214,10 +190,7 @@ function modalAgregarAntecedente(estado, alRecargar) {
         <span class="${ETIQUETA}">Observaciones</span>
         <textarea data-observaciones rows="2" class="${CAMPO_TEXTO}"></textarea>
       </label>
-      <div class="flex justify-end gap-2">
-        <button type="button" data-cancelar class="px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-        <button type="button" data-guardar class="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">Agregar</button>
-      </div>
+      ${pieModalHtml('Registrar')}
     </div>`);
 
   capa.querySelector('[data-cancelar]').addEventListener('click', cerrarModal);
@@ -236,7 +209,7 @@ function modalAgregarAntecedente(estado, alRecargar) {
       await conCarga(evento.currentTarget, async () => {
         await api.crear(`/api/pacientes/${encodeURIComponent(estado.paciente.id_paciente)}/antecedentes`, cuerpo);
         cerrarModal();
-        avisar('Antecedente agregado.');
+        avisar('Antecedente registrado.');
         await alRecargar(estado.paciente);
       });
     } catch (error) {

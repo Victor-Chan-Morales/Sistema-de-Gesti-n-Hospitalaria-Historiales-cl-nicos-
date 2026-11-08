@@ -15,12 +15,12 @@ async function vistaCitas(contenedor, params) {
   const filtros = { paciente: null, estado: '', profesional: '', desde: '', hasta: '' };
 
   contenedor.innerHTML = `
-    <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
-      <h1 class="text-xl font-semibold text-gray-800">Citas</h1>
-      <button type="button" data-programar class="bg-blue-600 text-white text-sm rounded px-4 py-2 hover:bg-blue-700">Programar cita</button>
-    </div>
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-3 bg-white border border-gray-200 rounded-lg p-4 mb-4">
-      <div data-espacio-paciente class="lg:col-span-2"></div>
+    ${encabezadoHtml('Agenda de citas', {
+      descripcion: 'Citas por día. Solo las programadas se pueden reprogramar, cancelar o atender.',
+      acciones: '<button type="button" data-programar class="btn btn-primario">Programar cita</button>',
+    })}
+    <div class="filtros grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 !items-end">
+      <div data-espacio-paciente class="sm:col-span-2"></div>
       <label class="block">
         <span class="${ETIQUETA}">Estado</span>
         <select data-estado class="${CAMPO_TEXTO}">
@@ -40,9 +40,9 @@ async function vistaCitas(contenedor, params) {
         <span class="${ETIQUETA}">Hasta</span>
         <input type="datetime-local" data-hasta class="${CAMPO_TEXTO}">
       </label>
-      <div class="flex items-end gap-2 lg:col-span-2">
-        <button type="button" data-aplicar class="bg-gray-800 text-white text-sm rounded px-4 py-2 hover:bg-gray-900">Aplicar filtros</button>
-        <button type="button" data-limpiar class="border border-gray-300 text-gray-700 text-sm rounded px-4 py-2 hover:bg-gray-50">Limpiar</button>
+      <div class="flex items-end gap-2 sm:col-span-2">
+        <button type="button" data-aplicar class="btn btn-secundario">Filtrar</button>
+        <button type="button" data-limpiar class="enlace px-2 py-2">Quitar filtros</button>
       </div>
     </div>
     <div id="tabla-citas"></div>`;
@@ -67,7 +67,7 @@ async function vistaCitas(contenedor, params) {
 
   const cargar = async () => {
     const zona = contenedor.querySelector('#tabla-citas');
-    zona.innerHTML = '<p class="text-sm text-gray-500 py-6 text-center">Cargando...</p>';
+    zona.innerHTML = cargandoHtml('Cargando agenda...');
     try {
       const consulta = construirConsulta({
         id_paciente: filtros.paciente,
@@ -82,36 +82,50 @@ async function vistaCitas(contenedor, params) {
       ]);
 
       if (!citas.length) {
-        zona.innerHTML = `<div class="bg-white border border-gray-200 rounded-lg p-6 text-center text-gray-400 text-sm">Sin citas con estos filtros.</div>`;
+        zona.innerHTML = `<div class="tabla-marco">${vacioHtml('No hay citas con estos filtros', ' Quita algún filtro o programa una cita nueva.')}</div>`;
         return;
       }
 
+      // Agenda: un bloque por día, en orden cronológico.
+      const porDia = new Map();
+      [...citas].sort((x, y) => String(x.fecha_hora).localeCompare(String(y.fecha_hora))).forEach((cita) => {
+        const dia = String(cita.fecha_hora).slice(0, 10);
+        if (!porDia.has(dia)) porDia.set(dia, []);
+        porDia.get(dia).push(cita);
+      });
+      const diaHoy = hoy();
+
       zona.innerHTML = `
-        <div class="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-          <table class="w-full text-sm">
+        <div class="tabla-marco">
+          <table>
             <thead>
-              <tr class="text-left text-xs uppercase text-gray-500 border-b bg-gray-50">
-                <th class="px-3 py-2">Fecha y hora</th>
+              <tr>
+                <th class="px-4 py-2 w-20">Hora</th>
                 <th class="px-3 py-2">Paciente</th>
                 <th class="px-3 py-2">Profesional</th>
                 <th class="px-3 py-2">Motivo</th>
-                <th class="px-3 py-2">Observaciones</th>
                 <th class="px-3 py-2">Estado</th>
-                <th class="px-3 py-2"></th>
+                <th class="px-3 py-2"><span class="sr-only">Acciones</span></th>
               </tr>
             </thead>
+            ${[...porDia].map(([dia, delDia]) => `
             <tbody>
-              ${citas.map((cita) => `
-                <tr class="border-b last:border-0 hover:bg-gray-50" data-id="${esc(cita.id_cita)}" data-fila="${esc(cita.id_cita)}">
-                  <td class="px-3 py-2 whitespace-nowrap">${fechaHoraLarga(cita.fecha_hora)}</td>
-                  <td class="px-3 py-2">${esc(nombreDePaciente(nombres, cita.id_paciente))}</td>
-                  <td class="px-3 py-2" data-profesional="${esc(cita.id_usuario_profesional)}"></td>
-                  <td class="px-3 py-2">${o(cita.motivo_consulta)}</td>
-                  <td class="px-3 py-2 max-w-52 truncate">${o(cita.observaciones)}</td>
-                  <td class="px-3 py-2">${insignia(cita.estado)}</td>
-                  <td class="px-3 py-2 text-right whitespace-nowrap space-x-2"></td>
+              <tr class="!bg-gray-50">
+                <th colspan="6" scope="colgroup" class="px-4 py-2 text-left font-bold text-gray-800 first-letter:uppercase border-y border-gray-200">
+                  ${esc(fechaDia(dia))}${dia === diaHoy ? ' <span class="ml-2 text-sm text-blue-700">Hoy</span>' : ''}
+                  <span class="ml-2 text-sm font-normal text-gray-500">${delDia.length} ${delDia.length === 1 ? 'cita' : 'citas'}</span>
+                </th>
+              </tr>
+              ${delDia.map((cita) => `
+                <tr data-id="${esc(cita.id_cita)}" class="${cita.estado === 'Cancelada' ? 'text-gray-500' : ''}">
+                  <td class="px-4 py-2.5 text-lg font-bold whitespace-nowrap">${esc(String(cita.fecha_hora).slice(11, 16))}</td>
+                  <td class="px-3 py-2.5 font-bold">${esc(nombreDePaciente(nombres, cita.id_paciente))}</td>
+                  <td class="px-3 py-2.5" data-profesional="${esc(cita.id_usuario_profesional)}"></td>
+                  <td class="px-3 py-2.5">${o(cita.motivo_consulta)}${cita.observaciones ? `<span class="block text-sm text-gray-500 max-w-xs truncate" title="${esc(cita.observaciones)}">${esc(cita.observaciones)}</span>` : ''}</td>
+                  <td class="px-3 py-2.5">${insignia(cita.estado)}</td>
+                  <td class="px-3 py-2.5 text-right whitespace-nowrap space-x-3"></td>
                 </tr>`).join('')}
-            </tbody>
+            </tbody>`).join('')}
           </table>
         </div>`;
 
@@ -125,20 +139,20 @@ async function vistaCitas(contenedor, params) {
         }
       });
 
-      zona.querySelectorAll('tbody tr').forEach((fila) => {
+      zona.querySelectorAll('tbody tr[data-id]').forEach((fila) => {
         const id = fila.dataset.id;
         const cita = citas.find((c) => String(c.id_cita) === id);
         const acciones = fila.querySelector('td:last-child');
         if (cita.estado !== 'Programada') return;
         acciones.innerHTML = `
-          <button data-reprogramar class="text-blue-600 hover:text-blue-800 text-sm">Reprogramar</button>
-          <button data-no-asistio class="text-amber-600 hover:text-amber-800 text-sm">No asistió</button>
-          <button data-cancelar class="text-red-600 hover:text-red-800 text-sm">Cancelar</button>
-          ${puedeRegistrar ? `<a href="#/consultas?paciente=${encodeURIComponent(cita.id_paciente)}&cita=${encodeURIComponent(cita.id_cita)}" class="text-blue-700 font-medium hover:text-blue-900 text-sm">Iniciar consulta</a>` : ''}`;
+          ${puedeRegistrar ? `<a href="#/consultas?paciente=${encodeURIComponent(cita.id_paciente)}&cita=${encodeURIComponent(cita.id_cita)}" class="btn btn-primario btn-chico">Atender</a>` : ''}
+          <button type="button" data-reprogramar class="enlace">Reprogramar</button>
+          <button type="button" data-no-asistio class="enlace !text-amber-800">No asistió</button>
+          <button type="button" data-cancelar class="enlace-quitar">Cancelar</button>`;
 
         acciones.querySelector('[data-reprogramar]').addEventListener('click', () => modalReprogramar(cita, cargar));
         acciones.querySelector('[data-no-asistio]').addEventListener('click', async (e) => {
-          if (!await confirmar('Marcar la cita como No Asistió?', { textoBoton: 'Marcar' })) return;
+          if (!await confirmar('La cita quedará registrada como No Asistió y ya no se podrá modificar.', { textoBoton: 'Marcar no asistió', titulo: 'Paciente no asistió' })) return;
           try {
             await conCarga(e.currentTarget, async () => {
               await api.actualizar(`/api/citas/${encodeURIComponent(id)}`, { estado: 'No Asistió' });
@@ -148,7 +162,7 @@ async function vistaCitas(contenedor, params) {
           } catch (error) { avisar(error.message, 'error'); }
         });
         acciones.querySelector('[data-cancelar]').addEventListener('click', async (e) => {
-          if (!await confirmar('Cancelar esta cita?', { textoBoton: 'Cancelar cita' })) return;
+          if (!await confirmar('La cita se cancelará y el horario quedará libre. Esta acción no se puede deshacer.', { textoBoton: 'Cancelar cita', titulo: 'Cancelar cita', peligro: true })) return;
           try {
             await conCarga(e.currentTarget, async () => {
               await api.actualizar(`/api/citas/${encodeURIComponent(id)}`, { estado: 'Cancelada' });
@@ -204,7 +218,7 @@ function modalProgramarCita(contenedor, profesionales, alGuardar) {
   const sugerida = aValorDateTimeLocal(inicial);
 
   const capa = abrirModal('Programar cita', `
-    <div class="space-y-3">
+    <div class="space-y-4">
       <div data-zona-selector></div>
       <label class="block">
         <span class="${ETIQUETA}">Profesional *</span>
@@ -224,10 +238,7 @@ function modalProgramarCita(contenedor, profesionales, alGuardar) {
         <span class="${ETIQUETA}">Observaciones</span>
         <textarea data-observaciones rows="2" class="${CAMPO_TEXTO}"></textarea>
       </label>
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" data-cancelar class="px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-        <button type="button" data-guardar class="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">Programar</button>
-      </div>
+      ${pieModalHtml('Programar cita')}
     </div>`, { alMontar: (capaModal) => {
       capaModal.querySelector('[data-zona-selector]').appendChild(selector.elemento);
     } });
@@ -263,8 +274,8 @@ function modalProgramarCita(contenedor, profesionales, alGuardar) {
 
 function modalReprogramar(cita, alGuardar) {
   const capa = abrirModal('Reprogramar cita', `
-    <div class="space-y-3">
-      <p class="text-sm text-gray-500">${fechaHoraLarga(cita.fecha_hora)} · ${insignia(cita.estado)}</p>
+    <div class="space-y-4">
+      <p class="text-gray-700">Programada para el <strong>${fechaHoraLarga(cita.fecha_hora)}</strong>.</p>
       <label class="block">
         <span class="${ETIQUETA}">Nueva fecha y hora</span>
         <input type="datetime-local" data-fecha value="${esc(String(cita.fecha_hora).slice(0, 16))}" class="${CAMPO_TEXTO}">
@@ -277,10 +288,7 @@ function modalReprogramar(cita, alGuardar) {
         <span class="${ETIQUETA}">Observaciones</span>
         <textarea data-observaciones rows="2" class="${CAMPO_TEXTO}">${esc(cita.observaciones ?? '')}</textarea>
       </label>
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" data-cancelar class="px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cerrar</button>
-        <button type="button" data-guardar class="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">Guardar cambios</button>
-      </div>
+      ${pieModalHtml('Guardar cambios')}
     </div>`);
 
   capa.querySelector('[data-cancelar]').addEventListener('click', cerrarModal);

@@ -6,8 +6,8 @@ const sesion = requiereSesion();
 function armarEncabezado(usuario) {
   document.getElementById('institucion').textContent = INSTITUCIONES[idDeInstitucion(usuario)] ?? '';
   document.getElementById('datos-usuario').innerHTML = `
-    <p class="text-sm font-medium text-gray-800">${esc(usuario.nombres)} ${esc(usuario.apellidos)}</p>
-    <p class="text-xs text-gray-500"><span class="inline-block rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">${esc(usuario.rol)}</span></p>`;
+    <p class="usuario-nombre">${esc(usuario.nombres)} ${esc(usuario.apellidos)}</p>
+    <p class="usuario-rol">${esc(usuario.rol)}</p>`;
   document.getElementById('salir').addEventListener('click', () => {
     limpiarSesion();
     window.location.replace('index.html');
@@ -27,22 +27,13 @@ function vistasVisibles(usuario) {
 function armarNavegacion(usuario) {
   const navegacion = document.getElementById('navegacion');
   navegacion.innerHTML = vistasVisibles(usuario).map(([id, vista]) => `
-    <button type="button" data-vista="${esc(id)}"
-            class="nav-boton whitespace-nowrap px-4 py-2 mb-1 rounded-t text-sm font-medium hover:bg-gray-100 text-gray-600">
-      ${esc(vista.titulo)}
-    </button>`).join('');
-  navegacion.querySelectorAll('[data-vista]').forEach((boton) => {
-    boton.addEventListener('click', () => { window.location.hash = `#/${boton.dataset.vista}`; });
-  });
+    <a href="#/${esc(id)}" data-vista="${esc(id)}" class="nav-boton">${esc(vista.titulo)}</a>`).join('');
 }
 
 function marcarNavegacion(idVista) {
   document.querySelectorAll('#navegacion [data-vista]').forEach((boton) => {
-    const activo = boton.dataset.vista === idVista;
-    boton.classList.toggle('bg-blue-600', activo);
-    boton.classList.toggle('text-white', activo);
-    boton.classList.toggle('hover:bg-gray-100', !activo);
-    boton.classList.toggle('text-gray-600', !activo);
+    if (boton.dataset.vista === idVista) boton.setAttribute('aria-current', 'page');
+    else boton.removeAttribute('aria-current');
   });
 }
 
@@ -54,7 +45,7 @@ async function navegar() {
 
   marcarNavegacion(idVista);
   cerrarModal();
-  contenedor.innerHTML = `<p class="text-sm text-gray-500 py-8 text-center">Cargando...</p>`;
+  contenedor.innerHTML = cargandoHtml();
 
   const vista = disponibles.find(([id]) => id === idVista);
   if (!vista) {
@@ -68,7 +59,9 @@ async function navegar() {
   }
 
   try {
+    document.title = `${vista[1].titulo} - Red de hospitales`;
     await vista[1].alMontar(contenedor, params);
+    window.scrollTo(0, 0);
   } catch (error) {
     contenedor.innerHTML = bannerErrorHtml(error);
   }

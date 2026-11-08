@@ -23,28 +23,26 @@ async function listaConsultas(contenedor) {
   const estado = { paciente: null, consultas: [], alergias: [] };
 
   contenedor.innerHTML = `
-    <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
-      <h1 class="text-xl font-semibold text-gray-800">Consultas</h1>
-      <button type="button" data-nueva class="bg-blue-600 text-white text-sm rounded px-4 py-2 hover:bg-blue-700">Nueva consulta</button>
-    </div>
-    <div class="bg-white border border-gray-200 rounded-lg p-4 mb-4" data-espacio-selector></div>
+    ${encabezadoHtml('Consultas', {
+      descripcion: 'Elige un paciente para ver sus consultas o registrar una nueva.',
+      acciones: '<button type="button" data-nueva class="btn btn-primario">Nueva consulta</button>',
+    })}
+    <div class="max-w-2xl mb-6" data-espacio-selector></div>
     <div data-zona-lista></div>`;
 
   const pintarLista = () => {
     const zona = contenedor.querySelector('[data-zona-lista]');
     if (!estado.paciente) {
-      zona.innerHTML = '<p class="text-sm text-gray-500 py-6 text-center">Busca y elige un paciente para ver sus consultas.</p>';
+      zona.innerHTML = vacioHtml('Elige un paciente', ' Búscalo por nombre o documento.');
       return;
     }
-    const alergiasHtml = estado.alergias.length
-      ? `<div class="mb-4">${bannerHtml(`<strong>Alergias del paciente:</strong> ${estado.alergias.map((a) => esc(`${a.sustancia}${a.nivel_gravedad ? ` (${a.nivel_gravedad})` : ''}`)).join(' · ')}`, 'advertencia')}</div>`
-      : '';
     zona.innerHTML = `
-      ${alergiasHtml}
-      <div class="bg-white rounded-lg border border-gray-200 p-4">
-        <h2 class="font-semibold text-gray-700 mb-2">Historial de consultas</h2>
-        ${tablaConsultasHtml(estado.consultas)}
-      </div>`;
+      ${fichaPacienteHtml(estado.paciente, { alergias: estado.alergias })}
+      <div class="seccion-cabeza">
+        <h2 class="titulo-seccion">Consultas del paciente</h2>
+        <span class="seccion-nota">${estado.consultas.length} en total</span>
+      </div>
+      ${tablaConsultasHtml(estado.consultas)}`;
   };
 
   const cargarPaciente = async (paciente) => {
@@ -56,7 +54,7 @@ async function listaConsultas(contenedor) {
       return;
     }
     const zona = contenedor.querySelector('[data-zona-lista]');
-    zona.innerHTML = '<p class="text-sm text-gray-500 py-6 text-center">Cargando consultas...</p>';
+    zona.innerHTML = cargandoHtml('Cargando consultas...');
     try {
       const historial = await api.obtener(`/api/pacientes/${encodeURIComponent(paciente.id_paciente)}/historial`);
       estado.consultas = historial.consultas ?? [];
@@ -73,6 +71,7 @@ async function listaConsultas(contenedor) {
   contenedor.querySelector('[data-nueva]').addEventListener('click', () => {
     if (!estado.paciente) {
       avisar('Elige primero el paciente de la consulta.', 'advertencia');
+      contenedor.querySelector('[data-espacio-selector] input')?.focus();
       return;
     }
     window.location.hash = `#/consultas?paciente=${encodeURIComponent(estado.paciente.id_paciente)}`;
@@ -84,32 +83,32 @@ async function listaConsultas(contenedor) {
 // ----- Formulario de registro atómico -----
 
 const filaDiagnosticoHtml = (opcionesDiag) => `
-  <div class="fila-diagnostico grid grid-cols-1 sm:grid-cols-4 gap-2 items-start mb-2">
+  <div class="fila-diagnostico renglon grid grid-cols-1 sm:grid-cols-4 gap-2 items-center">
     <select data-diagnostico required class="${CAMPO_TEXTO} sm:col-span-2">
       <option value="">Diagnóstico del catálogo *</option>
       ${opcionesDiag}
     </select>
-    <select data-tipo class="${CAMPO_TEXTO}">
+    <select data-tipo aria-label="Tipo de diagnóstico" class="${CAMPO_TEXTO}">
       <option value="">Tipo</option>
       ${['Presuntivo', 'Definitivo', 'Seguimiento'].map((t) => `<option>${t}</option>`).join('')}
     </select>
     <div class="flex gap-1">
-      <input type="text" data-observaciones placeholder="Observaciones" class="${CAMPO_TEXTO_CORTO} flex-1">
-      <button type="button" data-quitar-fila class="text-red-600 hover:text-red-800 text-sm px-1">Quitar</button>
+      <input type="text" data-observaciones placeholder="Observaciones" aria-label="Observaciones del diagnóstico" class="${CAMPO_TEXTO} flex-1">
+      <button type="button" data-quitar-fila class="enlace-quitar px-1">Quitar</button>
     </div>
   </div>`;
 
 const filaTratamientoHtml = () => `
-  <div class="fila-tratamiento border border-gray-200 rounded-lg p-3 mb-2 bg-gray-50">
+  <div class="fila-tratamiento renglon">
     <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
       <input type="text" data-descripcion required placeholder="Descripción *" maxlength="255" class="${CAMPO_TEXTO} sm:col-span-4">
-      <label class="text-xs text-gray-500">Inicio
+      <label class="text-sm font-bold text-gray-700">Inicio
         <input type="date" data-inicio class="${CAMPO_TEXTO_CORTO} w-full mt-1">
       </label>
-      <label class="text-xs text-gray-500">Fin
+      <label class="text-sm font-bold text-gray-700">Fin
         <input type="date" data-fin class="${CAMPO_TEXTO_CORTO} w-full mt-1">
       </label>
-      <label class="text-xs text-gray-500">Estado
+      <label class="text-sm font-bold text-gray-700">Estado
         <select data-estado class="${CAMPO_TEXTO_CORTO} w-full mt-1">
           <option value="">Activo</option>
           <option>Finalizado</option>
@@ -117,14 +116,14 @@ const filaTratamientoHtml = () => `
         </select>
       </label>
       <div class="flex items-end">
-        <button type="button" data-quitar-fila class="text-red-600 hover:text-red-800 text-sm">Quitar tratamiento</button>
+        <button type="button" data-quitar-fila class="enlace-quitar">Quitar tratamiento</button>
       </div>
       <input type="text" data-indicaciones placeholder="Indicaciones" maxlength="255" class="${CAMPO_TEXTO_CORTO} sm:col-span-4">
     </div>
   </div>`;
 
 const filaDetalleRecetaHtml = (opcionesMed) => `
-  <div class="fila-detalle grid grid-cols-1 sm:grid-cols-6 gap-2 items-start mb-2 border border-gray-200 rounded-lg p-2">
+  <div class="fila-detalle renglon grid grid-cols-1 sm:grid-cols-6 gap-2 items-start">
     <select data-medicamento required class="${CAMPO_TEXTO} sm:col-span-2">
       <option value="">Medicamento *</option>
       ${opcionesMed}
@@ -134,8 +133,8 @@ const filaDetalleRecetaHtml = (opcionesMed) => `
     <input type="text" data-via placeholder="Vía" maxlength="50" class="${CAMPO_TEXTO}">
     <input type="text" data-duracion placeholder="Duración" maxlength="50" class="${CAMPO_TEXTO}">
     <div class="flex gap-1 sm:col-span-6">
-      <input type="text" data-indicaciones placeholder="Indicaciones específicas" class="${CAMPO_TEXTO_CORTO} flex-1">
-      <button type="button" data-quitar-fila class="text-red-600 hover:text-red-800 text-sm px-1">Quitar</button>
+      <input type="text" data-indicaciones placeholder="Indicaciones específicas" aria-label="Indicaciones específicas" class="${CAMPO_TEXTO_CORTO} flex-1">
+      <button type="button" data-quitar-fila class="enlace-quitar px-1">Quitar</button>
     </div>
   </div>`;
 
@@ -151,6 +150,8 @@ const CAMPOS_SIGNOS = [
 
 async function formularioConsulta(contenedor, idPaciente, idCita) {
   const paciente = await api.obtener(`/api/pacientes/${encodeURIComponent(idPaciente)}`);
+  const alergias = await api.obtener(`/api/pacientes/${encodeURIComponent(idPaciente)}/historial`)
+    .then((h) => h.alergias ?? []).catch(() => undefined);
   const catalogos = await Promise.all([
     api.obtener('/api/catalogos/diagnosticos'),
     api.obtener('/api/catalogos/medicamentos'),
@@ -159,80 +160,72 @@ async function formularioConsulta(contenedor, idPaciente, idCita) {
   const opcionesDiag = opcionesSelect(catalogos.diagnosticos, (d) => d.id_catalogo_diag, (d) => `${d.nombre_diagnostico}${d.codigo_clinico ? ` [${d.codigo_clinico}]` : ''}`);
   const opcionesMed = opcionesSelect(catalogos.medicamentos, (m) => m.id_medicamento, (m) => `${m.nombre}${m.concentracion ? ` ${m.concentracion}` : ''}`);
 
+  const bloque = (titulo, nota, cuerpo) => `
+    <section class="form-bloque">
+      <header><h2>${titulo}</h2>${nota ? `<p>${nota}</p>` : ''}</header>
+      <div>${cuerpo}</div>
+    </section>`;
+
   contenedor.innerHTML = `
-    <div class="mb-4">
-      <a href="#/consultas" class="text-sm text-blue-600 hover:text-blue-800">&larr; Volver a consultas</a>
-      <h1 class="text-xl font-semibold text-gray-800 mt-1">Nueva consulta</h1>
-      <p class="text-sm text-gray-500">${esc(paciente.nombres)} ${esc(paciente.apellidos)} · ${edadComoTexto(paciente.fecha_nacimiento)} ${insignia(paciente.estado)}</p>
-      ${idCita ? `<p class="text-sm text-gray-500">La cita <span class="font-mono">${esc(idCita)}</span> quedará como Atendida al registrar la consulta.</p>` : ''}
+    <a href="#/consultas" class="volver">Consultas</a>
+    ${fichaPacienteHtml(paciente, { alergias })}
+    <div class="encabezado">
+      <h2 class="titulo-pagina">Nueva consulta</h2>
+      <p class="encabezado-desc">Consulta, signos, diagnósticos, tratamientos y receta se guardan juntos: si algo falla, no se guarda nada.${idCita ? ' La cita de origen quedará como atendida.' : ''}</p>
     </div>
-    <form data-formulario-consulta class="space-y-4">
-      <section class="bg-white rounded-lg border border-gray-200 p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">Motivo y anamnesis</h2>
-        <div class="grid grid-cols-1 gap-3">
+    <form data-formulario-consulta>
+      ${bloque('Motivo y anamnesis', 'Lo que refiere el paciente y lo que encuentras al examinarlo.', `
+        <div class="grid grid-cols-1 gap-4">
           <label class="block">
             <span class="${ETIQUETA}">Motivo de consulta</span>
             <input type="text" data-campo="motivo_consulta" maxlength="255" class="${CAMPO_TEXTO}">
           </label>
-          <label class="block">
-            <span class="${ETIQUETA}">Síntomas</span>
-            <textarea data-campo="sintomas" rows="2" class="${CAMPO_TEXTO}"></textarea>
-          </label>
-          <label class="block">
-            <span class="${ETIQUETA}">Examen físico</span>
-            <textarea data-campo="examen_fisico" rows="2" class="${CAMPO_TEXTO}"></textarea>
-          </label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label class="block">
+              <span class="${ETIQUETA}">Síntomas</span>
+              <textarea data-campo="sintomas" rows="3" class="${CAMPO_TEXTO}"></textarea>
+            </label>
+            <label class="block">
+              <span class="${ETIQUETA}">Examen físico</span>
+              <textarea data-campo="examen_fisico" rows="3" class="${CAMPO_TEXTO}"></textarea>
+            </label>
+          </div>
           <label class="block">
             <span class="${ETIQUETA}">Notas clínicas</span>
             <textarea data-campo="notas_clinicas" rows="2" class="${CAMPO_TEXTO}"></textarea>
           </label>
-          <label class="block">
-            <span class="${ETIQUETA}">Estado de la consulta</span>
-            <select data-campo="estado" class="${CAMPO_TEXTO} w-56">
-              <option value="Abierta">Abierta</option>
-              <option value="Finalizada">Finalizada</option>
-            </select>
-          </label>
-        </div>
-      </section>
-
-      <section class="bg-white rounded-lg border border-gray-200 p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">Signos vitales</h2>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        </div>`)}
+      ${bloque('Signos vitales', 'Opcionales. Deja vacío lo que no se midió.', `
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           ${CAMPOS_SIGNOS.map(([clave, titulo, tipo]) => `
             <label class="block">
               <span class="${ETIQUETA}">${titulo}</span>
-              <input type="${tipo}" step="any" min="0" data-signo="${clave}" class="${CAMPO_TEXTO}">
+              <input type="${tipo}" ${tipo === 'number' ? 'step="any" min="0" inputmode="decimal"' : 'placeholder="120/80"'} data-signo="${clave}" class="${CAMPO_TEXTO}">
             </label>`).join('')}
-        </div>
-      </section>
-
-      <section class="bg-white rounded-lg border border-gray-200 p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">Diagnósticos</h2>
+        </div>`)}
+      ${bloque('Diagnósticos', 'Del catálogo de la institución. Puedes registrar varios.', `
         <div data-coleccion-diagnosticos></div>
-        <button type="button" data-agregar="diagnostico" class="text-sm text-blue-600 hover:text-blue-800">Agregar diagnóstico</button>
-      </section>
-
-      <section class="bg-white rounded-lg border border-gray-200 p-4">
-        <h2 class="font-semibold text-gray-800 mb-3">Tratamientos</h2>
+        <button type="button" data-agregar="diagnostico" class="enlace">Añadir diagnóstico</button>`)}
+      ${bloque('Tratamientos', 'Indicaciones no farmacológicas o procedimientos.', `
         <div data-coleccion-tratamientos></div>
-        <button type="button" data-agregar="tratamiento" class="text-sm text-blue-600 hover:text-blue-800">Agregar tratamiento</button>
-      </section>
-
-      <section class="bg-white rounded-lg border border-gray-200 p-4">
-        <h2 class="font-semibold text-gray-800 mb-1">Receta</h2>
-        <p class="text-sm text-gray-500 mb-3">Si el paciente tiene alergias relacionadas, la API devolverá advertencias visibles.</p>
-        <label class="block mb-3">
+        <button type="button" data-agregar="tratamiento" class="enlace">Añadir tratamiento</button>`)}
+      ${bloque('Receta', 'Si un medicamento se relaciona con una alergia del paciente, verás una advertencia al guardar. No bloquea: decides tú.', `
+        <label class="block mb-4">
           <span class="${ETIQUETA}">Indicaciones generales</span>
           <input type="text" data-receta-general maxlength="255" class="${CAMPO_TEXTO}">
         </label>
         <div data-coleccion-detalles></div>
-        <button type="button" data-agregar="detalle" class="text-sm text-blue-600 hover:text-blue-800">Agregar medicamento recetado</button>
-      </section>
-
-      <div class="flex gap-2">
-        <button type="submit" data-guardar class="bg-blue-600 text-white text-sm rounded px-4 py-2 hover:bg-blue-700">Registrar consulta</button>
-        <a href="#/consultas" class="border border-gray-300 text-gray-700 text-sm rounded px-4 py-2 hover:bg-gray-50">Cancelar</a>
+        <button type="button" data-agregar="detalle" class="enlace">Añadir medicamento</button>`)}
+      <div class="form-pie items-center flex-wrap">
+        <button type="submit" data-guardar class="btn btn-primario">Registrar consulta</button>
+        <a href="#/consultas" class="btn btn-secundario">Cancelar</a>
+        <label class="ml-auto flex items-center gap-2 text-sm">
+          <span class="font-bold">Al guardar, la consulta queda</span>
+          <select data-campo="estado" class="${CAMPO_TEXTO_CORTO}">
+            <option value="Abierta">Abierta</option>
+            <option value="Finalizada">Finalizada</option>
+          </select>
+        </label>
       </div>
     </form>`;
 
@@ -256,6 +249,7 @@ async function formularioConsulta(contenedor, idPaciente, idCita) {
       tratamiento: filaTratamientoHtml(),
       detalle: filaDetalleRecetaHtml(opcionesMed),
     }[agregar.dataset.agregar]);
+    destino.lastElementChild?.querySelector('select, input')?.focus();
   });
 
   formulario.addEventListener('submit', async (evento) => {
@@ -347,7 +341,7 @@ async function formularioConsulta(contenedor, idPaciente, idCita) {
 // ----- Detalle de consulta -----
 
 const filaDetalleRecetaDetalleHtml = (detalle) => `
-  <tr class="border-b last:border-0">
+  <tr>
     <td class="px-3 py-2 font-medium text-gray-800">${o(detalle.nombre_medicamento)}</td>
     <td class="px-3 py-2">${o(detalle.dosis)}</td>
     <td class="px-3 py-2">${o(detalle.frecuencia)}</td>
@@ -357,13 +351,15 @@ const filaDetalleRecetaDetalleHtml = (detalle) => `
   </tr>`;
 
 const tarjetaRecetaHtml = (receta) => `
-  <div class="border border-gray-200 rounded-lg p-3 mb-2">
-    <p class="text-sm font-medium text-gray-700 mb-2">Receta del ${fechaLarga(receta.fecha_receta)}</p>
-    ${receta.indicaciones_generales ? `<p class="text-sm text-gray-600 mb-2">${esc(receta.indicaciones_generales)}</p>` : ''}
+  <div class="tabla-marco mb-3">
+    <div class="flex items-baseline justify-between gap-3 flex-wrap px-4 py-2.5 border-b border-gray-200">
+      <p class="font-bold">Receta del ${fechaLarga(receta.fecha_receta)}</p>
+      ${receta.indicaciones_generales ? `<p class="text-sm text-gray-700">${esc(receta.indicaciones_generales)}</p>` : ''}
+    </div>
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table>
         <thead>
-          <tr class="text-left text-xs uppercase text-gray-500 border-b">
+          <tr>
             <th class="px-3 py-2">Medicamento</th><th class="px-3 py-2">Dosis</th><th class="px-3 py-2">Frecuencia</th>
             <th class="px-3 py-2">Vía</th><th class="px-3 py-2">Duración</th><th class="px-3 py-2">Indicaciones</th>
           </tr>
@@ -388,88 +384,77 @@ async function detalleConsulta(contenedor, id) {
   advertenciasPendientes = [];
 
   const pintar = (consultaActual, advertenciasActuales = []) => {
+    const editable = puedeRegistrar && consultaActual.estado !== 'Anulada';
+    const tablaSimple = (filas, vacio, columnas, celdas) => (filas.length === 0
+      ? `<p class="text-gray-600 py-1">${esc(vacio)}</p>`
+      : `<div class="tabla-marco"><table>
+          <thead><tr>${columnas.map((c) => `<th class="px-3 py-2">${c}</th>`).join('')}</tr></thead>
+          <tbody>${filas.map((f) => `<tr>${celdas(f).map((c, i) => `<td class="px-3 py-2.5 ${i === 0 ? 'font-bold' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table></div>`);
+
     contenedor.innerHTML = `
-      <div class="mb-4">
-        <a href="#/consultas" class="text-sm text-blue-600 hover:text-blue-800">&larr; Volver a consultas</a>
-      </div>
-      ${advertenciasActuales.length ? `<div class="mb-4">${bannerHtml(`<strong>Advertencias de alergias:</strong><br>${advertenciasActuales.map((a) => esc(a)).join('<br>')}`, 'advertencia')}</div>` : ''}
-      <div class="flex items-center gap-2 flex-wrap mb-4">
-        <h1 class="text-xl font-semibold text-gray-800">Consulta del ${fechaHoraLarga(consultaActual.fecha_hora)}</h1>
-        ${insignia(consultaActual.estado)}
-        <div class="flex-1"></div>
-        ${puedeRegistrar && consultaActual.estado === 'Abierta' ? '<button type="button" data-finalizar class="bg-green-600 text-white text-sm rounded px-3 py-2 hover:bg-green-700">Finalizar</button>' : ''}
-        ${puedeRegistrar && (consultaActual.estado === 'Abierta' || consultaActual.estado === 'Finalizada') ? '<button type="button" data-anular class="border border-red-300 text-red-700 text-sm rounded px-3 py-2 hover:bg-red-50">Anular</button>' : ''}
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-2 mb-4">
-        <div class="bg-white border border-gray-200 rounded-lg p-4">
-          <p class="text-xs text-gray-500">Paciente</p>
-          <p class="font-medium text-gray-800">${esc(nombreDePaciente(nombres, consultaActual.id_paciente))}</p>
-          <a class="text-sm text-blue-600 hover:text-blue-800" href="#/historial?paciente=${encodeURIComponent(consultaActual.id_paciente)}">Ver historial</a>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-lg p-4">
-          <p class="text-xs text-gray-500">Profesional</p>
-          <p class="font-medium text-gray-800">${profesional ? esc(`${profesional.nombres} ${profesional.apellidos}`) : o(consultaActual.id_usuario_profesional)}</p>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-lg p-4">
-          <p class="text-xs text-gray-500">Cita de origen</p>
-          <p class="font-medium text-gray-800">${consultaActual.id_cita ? esc(consultaActual.id_cita) : 'Consulta directa'}</p>
+      <a href="#/historial?paciente=${encodeURIComponent(consultaActual.id_paciente)}" class="volver">Historial de ${esc(nombreDePaciente(nombres, consultaActual.id_paciente))}</a>
+      ${advertenciasActuales.length ? `<div class="mb-5">${bannerHtml(`<strong>Revisa la receta: posible alergia.</strong><br>${advertenciasActuales.map((a) => esc(a)).join('<br>')}`, 'error')}</div>` : ''}
+      <div class="encabezado">
+        <div class="encabezado-fila">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h1 class="titulo-pagina">Consulta del ${fechaHoraLarga(consultaActual.fecha_hora)}</h1>
+            ${insignia(consultaActual.estado)}
+          </div>
+          <div class="acciones">
+            ${puedeRegistrar && consultaActual.estado === 'Abierta' ? '<button type="button" data-finalizar class="btn btn-primario">Finalizar consulta</button>' : ''}
+            ${puedeRegistrar && (consultaActual.estado === 'Abierta' || consultaActual.estado === 'Finalizada') ? '<button type="button" data-anular class="btn btn-peligro">Anular</button>' : ''}
+          </div>
         </div>
       </div>
 
-      <section class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-        <h2 class="font-semibold text-gray-800 mb-3">Anamnesis</h2>
-        <dl class="text-sm space-y-2">
-          <div><dt class="text-gray-500">Motivo de consulta</dt><dd>${o(consultaActual.motivo_consulta)}</dd></div>
-          <div><dt class="text-gray-500">Síntomas</dt><dd>${o(consultaActual.sintomas)}</dd></div>
-          <div><dt class="text-gray-500">Examen físico</dt><dd>${o(consultaActual.examen_fisico)}</dd></div>
-          <div><dt class="text-gray-500">Notas clínicas</dt><dd>${o(consultaActual.notas_clinicas)}</dd></div>
-        </dl>
-      </section>
+      <dl class="datos border-y border-gray-200 py-4 mb-6">
+        <div><dt>Paciente</dt><dd>${esc(nombreDePaciente(nombres, consultaActual.id_paciente))}</dd></div>
+        <div><dt>Profesional</dt><dd>${profesional ? esc(`${profesional.nombres} ${profesional.apellidos}`) : o(consultaActual.id_usuario_profesional)}</dd></div>
+        <div><dt>Origen</dt><dd>${consultaActual.id_cita ? 'Cita programada' : 'Consulta directa'}</dd></div>
+      </dl>
 
-      <section class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-        <h2 class="font-semibold text-gray-800 mb-3">Signos vitales</h2>
-        ${signosHtmlDe(consultaActual)}
-      </section>
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-x-10">
+        <section class="lg:col-span-3 mb-6">
+          <h2 class="titulo-seccion mb-3">Anamnesis</h2>
+          <dl class="texto-clinico">
+            <dt>Motivo de consulta</dt><dd>${o(consultaActual.motivo_consulta)}</dd>
+            <dt>Síntomas</dt><dd>${o(consultaActual.sintomas)}</dd>
+            <dt>Examen físico</dt><dd>${o(consultaActual.examen_fisico)}</dd>
+            <dt>Notas clínicas</dt><dd>${o(consultaActual.notas_clinicas)}</dd>
+          </dl>
+        </section>
+        <section class="lg:col-span-2 mb-6">
+          <h2 class="titulo-seccion mb-3">Signos vitales</h2>
+          ${signosHtmlDe(consultaActual)}
+        </section>
+      </div>
 
-      <section class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold text-gray-800">Diagnósticos</h2>
-          ${puedeRegistrar && consultaActual.estado !== 'Anulada' ? '<button type="button" data-agregar-diagnostico class="text-sm text-blue-600 hover:text-blue-800">Agregar</button>' : ''}
+      <section class="seccion">
+        <div class="seccion-cabeza">
+          <h2 class="titulo-seccion">Diagnósticos</h2>
+          ${editable ? '<button type="button" data-agregar-diagnostico class="enlace">Añadir diagnóstico</button>' : ''}
         </div>
-        ${(consultaActual.diagnosticos ?? []).length === 0
-          ? '<p class="text-sm text-gray-400">Sin diagnósticos.</p>'
-          : `<table class="w-full text-sm"><tbody>${consultaActual.diagnosticos.map((d) => `
-              <tr class="border-b last:border-0">
-                <td class="px-3 py-2 font-medium text-gray-800">${esc(d.nombre_diagnostico)}</td>
-                <td class="px-3 py-2">${o(d.tipo)}</td>
-                <td class="px-3 py-2 text-gray-600">${o(d.observaciones)}</td>
-              </tr>`).join('')}</tbody></table>`}
+        ${tablaSimple(consultaActual.diagnosticos ?? [], 'Sin diagnósticos.', ['Diagnóstico', 'Tipo', 'Observaciones'],
+          (d) => [esc(d.nombre_diagnostico), o(d.tipo), o(d.observaciones)])}
       </section>
 
-      <section class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold text-gray-800">Tratamientos</h2>
-          ${puedeRegistrar && consultaActual.estado !== 'Anulada' ? '<button type="button" data-agregar-tratamiento class="text-sm text-blue-600 hover:text-blue-800">Agregar</button>' : ''}
+      <section class="seccion">
+        <div class="seccion-cabeza">
+          <h2 class="titulo-seccion">Tratamientos</h2>
+          ${editable ? '<button type="button" data-agregar-tratamiento class="enlace">Añadir tratamiento</button>' : ''}
         </div>
-        ${(consultaActual.tratamientos ?? []).length === 0
-          ? '<p class="text-sm text-gray-400">Sin tratamientos.</p>'
-          : `<table class="w-full text-sm"><tbody>${consultaActual.tratamientos.map((t) => `
-              <tr class="border-b last:border-0">
-                <td class="px-3 py-2 font-medium text-gray-800">${esc(t.descripcion)}</td>
-                <td class="px-3 py-2">${fechaLarga(t.fecha_inicio)}${t.fecha_fin ? ` a ${fechaLarga(t.fecha_fin)}` : ''}</td>
-                <td class="px-3 py-2">${o(t.estado)}</td>
-                <td class="px-3 py-2 text-gray-600">${o(t.indicaciones)}</td>
-              </tr>`).join('')}</tbody></table>`}
+        ${tablaSimple(consultaActual.tratamientos ?? [], 'Sin tratamientos.', ['Tratamiento', 'Periodo', 'Estado', 'Indicaciones'],
+          (t) => [esc(t.descripcion), `${fechaLarga(t.fecha_inicio)}${t.fecha_fin ? ` a ${fechaLarga(t.fecha_fin)}` : ''}`, o(t.estado), o(t.indicaciones)])}
       </section>
 
-      <section class="bg-white rounded-lg border border-gray-200 p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold text-gray-800">Recetas</h2>
-          ${puedeRegistrar && consultaActual.estado !== 'Anulada' ? '<button type="button" data-agregar-receta class="text-sm text-blue-600 hover:text-blue-800">Nueva receta</button>' : ''}
+      <section class="seccion">
+        <div class="seccion-cabeza">
+          <h2 class="titulo-seccion">Recetas</h2>
+          ${editable ? '<button type="button" data-agregar-receta class="enlace">Nueva receta</button>' : ''}
         </div>
         ${(consultaActual.recetas ?? []).length === 0
-          ? '<p class="text-sm text-gray-400">Sin recetas.</p>'
+          ? '<p class="text-gray-600 py-1">Sin recetas.</p>'
           : consultaActual.recetas.map(tarjetaRecetaHtml).join('')}
       </section>`;
 
@@ -478,7 +463,7 @@ async function detalleConsulta(contenedor, id) {
       botonFinalizar.addEventListener('click', async () => {
         try {
           await conCarga(botonFinalizar, async () => {
-            const actualizada = await api.actualizar(`/api/consultas/${encodeURIComponent(id)}`, { estado: 'Finalizada' });
+            const actualizada = await api.actualizar(`/api/consultas/${encodeURIComponent(id)}/estado`, { estado: 'Finalizada' });
             avisar('Consulta finalizada.');
             pintar(actualizada);
           });
@@ -488,10 +473,10 @@ async function detalleConsulta(contenedor, id) {
     const botonAnular = contenedor.querySelector('[data-anular]');
     if (botonAnular) {
       botonAnular.addEventListener('click', async () => {
-        if (!await confirmar('Anular la consulta deja registro de la anulación en el historial.', { textoBoton: 'Anular' })) return;
+        if (!await confirmar('La consulta queda en el historial marcada como anulada y ya no admite datos nuevos.', { textoBoton: 'Anular consulta', titulo: 'Anular consulta', peligro: true })) return;
         try {
           await conCarga(botonAnular, async () => {
-            const actualizada = await api.actualizar(`/api/consultas/${encodeURIComponent(id)}`, { estado: 'Anulada' });
+            const actualizada = await api.actualizar(`/api/consultas/${encodeURIComponent(id)}/estado`, { estado: 'Anulada' });
             avisar('Consulta anulada.');
             pintar(actualizada);
           });
@@ -509,11 +494,11 @@ async function detalleConsulta(contenedor, id) {
 
   const signosHtmlDe = (consultaActual) => {
     const signos = consultaActual.signos_vitales;
-    if (!signos) return '<p class="text-sm text-gray-400">Sin signos vitales registrados.</p>';
-    return `<dl class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+    if (!signos) return '<p class="text-gray-600">Sin signos vitales registrados.</p>';
+    return `<dl class="divide-y divide-gray-200 border-y border-gray-200">
       ${CAMPOS_SIGNOS.map(([clave, titulo]) => {
         const crudo = signos[clave];
-        return `<div><dt class="text-xs text-gray-500">${titulo}</dt><dd class="font-medium text-gray-800">${o(crudo === null || crudo === undefined ? '' : String(crudo))}</dd></div>`;
+        return `<div class="flex justify-between gap-4 py-2"><dt class="text-gray-600">${titulo}</dt><dd class="font-bold tabular-nums">${o(crudo === null || crudo === undefined ? '' : String(crudo))}</dd></div>`;
       }).join('')}
     </dl>`;
   };
@@ -525,8 +510,8 @@ async function detalleConsulta(contenedor, id) {
 
 async function modalAgregarDiagnostico(idConsulta, alPintar) {
   const diagnosticos = await api.obtener('/api/catalogos/diagnosticos');
-  const capa = abrirModal('Agregar diagnóstico', `
-    <div class="space-y-3">
+  const capa = abrirModal('Añadir diagnóstico', `
+    <div class="space-y-4">
       <label class="block">
         <span class="${ETIQUETA}">Diagnóstico *</span>
         <select data-diagnostico required class="${CAMPO_TEXTO}">
@@ -544,10 +529,7 @@ async function modalAgregarDiagnostico(idConsulta, alPintar) {
         <span class="${ETIQUETA}">Observaciones</span>
         <textarea data-observaciones rows="2" class="${CAMPO_TEXTO}"></textarea>
       </label>
-      <div class="flex justify-end gap-2">
-        <button type="button" data-cancelar class="px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-        <button type="button" data-guardar class="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">Agregar</button>
-      </div>
+      ${pieModalHtml('Añadir diagnóstico')}
     </div>`);
 
   capa.querySelector('[data-cancelar]').addEventListener('click', cerrarModal);
@@ -571,8 +553,8 @@ async function modalAgregarDiagnostico(idConsulta, alPintar) {
 }
 
 async function modalAgregarTratamiento(idConsulta, alPintar) {
-  const capa = abrirModal('Agregar tratamiento', `
-    <div class="space-y-3">
+  const capa = abrirModal('Añadir tratamiento', `
+    <div class="space-y-4">
       <label class="block">
         <span class="${ETIQUETA}">Descripción *</span>
         <input type="text" data-descripcion maxlength="255" required class="${CAMPO_TEXTO}">
@@ -597,10 +579,7 @@ async function modalAgregarTratamiento(idConsulta, alPintar) {
         <span class="${ETIQUETA}">Indicaciones</span>
         <textarea data-indicaciones rows="2" class="${CAMPO_TEXTO}"></textarea>
       </label>
-      <div class="flex justify-end gap-2">
-        <button type="button" data-cancelar class="px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-        <button type="button" data-guardar class="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">Agregar</button>
-      </div>
+      ${pieModalHtml('Añadir tratamiento')}
     </div>`);
 
   capa.querySelector('[data-cancelar]').addEventListener('click', cerrarModal);
@@ -633,18 +612,15 @@ async function modalAgregarReceta(idConsulta, alPintar) {
   const medicamentos = await api.obtener('/api/catalogos/medicamentos');
   const opcionesMed = opcionesSelect(medicamentos, (m) => m.id_medicamento, (m) => `${m.nombre}${m.concentracion ? ` ${m.concentracion}` : ''}`);
   const capa = abrirModal('Nueva receta', `
-    <div class="space-y-3">
+    <div class="space-y-4">
       <label class="block">
         <span class="${ETIQUETA}">Indicaciones generales</span>
         <input type="text" data-general maxlength="255" class="${CAMPO_TEXTO}">
       </label>
       <div data-detalles>${filaDetalleRecetaHtml(opcionesMed)}</div>
-      <button type="button" data-agregar-detalle class="text-sm text-blue-600 hover:text-blue-800">Agregar medicamento</button>
-      <p class="text-sm text-gray-500">Si algo recetado se cruza con las alergias del paciente, verás una advertencia al guardar.</p>
-      <div class="flex justify-end gap-2">
-        <button type="button" data-cancelar class="px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-        <button type="button" data-guardar class="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">Guardar receta</button>
-      </div>
+      <button type="button" data-agregar-detalle class="enlace">Añadir medicamento</button>
+      <p class="text-sm text-gray-600">Si algo recetado se relaciona con una alergia del paciente, verás una advertencia al guardar.</p>
+      ${pieModalHtml('Guardar receta')}
     </div>`, { ampliada: true });
 
   capa.querySelector('[data-agregar-detalle]').addEventListener('click', () => {

@@ -35,6 +35,12 @@ const fechaHoraLarga = (iso) => {
   return `${dia} ${MESES[Number(mes) - 1]} ${anio}${horaCorta}`;
 };
 
+// '2026-12-01' → 'martes, 1 de diciembre de 2026' (encabezado de agenda).
+const fechaDia = (iso) => {
+  const [anio, mes, dia] = String(iso).slice(0, 10).split('-').map(Number);
+  return new Date(anio, mes - 1, dia).toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+};
+
 // Fecha y hora local en el formato del contrato, sin pasar por UTC.
 const ahora = () => {
   const fecha = new Date();
@@ -97,25 +103,25 @@ const CLASES_ESTADO = {
 };
 
 const insignia = (texto, extra = '') =>
-  `<span class="inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${CLASES_ESTADO[texto] ?? 'bg-gray-100 text-gray-600'} ${extra}">${esc(texto ?? '—')}</span>`;
+  `<span class="inline-block whitespace-nowrap rounded px-2 py-0.5 text-xs font-bold ${CLASES_ESTADO[texto] ?? 'bg-gray-100 text-gray-600'} ${extra}">${esc(texto ?? '—')}</span>`;
 
-const CAMPO_TEXTO = 'w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
-const CAMPO_TEXTO_CORTO = 'border border-gray-300 rounded px-2 py-1.5 text-sm';
+const CAMPO_TEXTO = 'w-full min-h-[2.6rem] border border-gray-300 rounded-md px-3 py-2 text-[0.95rem] focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600';
+const CAMPO_TEXTO_CORTO = 'border border-gray-300 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600';
 
-const ETIQUETA = 'block text-sm font-medium text-gray-700 mb-1';
+const ETIQUETA = 'block text-sm font-bold text-gray-800 mb-1';
 
 // Avisos flotantes; cualquier página necesita <div id="avisos">.
 function avisar(mensaje, tipo = 'exito') {
   const contenedor = document.getElementById('avisos');
   if (!contenedor) return;
   const clases = {
-    exito: 'bg-green-600',
+    exito: 'bg-blue-800',
     error: 'bg-red-600',
-    advertencia: 'bg-amber-500',
-    info: 'bg-blue-600',
+    advertencia: 'bg-amber-700',
+    info: 'bg-gray-800',
   }[tipo] ?? 'bg-gray-700';
   const aviso = document.createElement('div');
-  aviso.className = `${clases} text-white text-sm rounded-lg shadow-lg px-4 py-2.5 max-w-sm transition-opacity duration-300 cursor-pointer`;
+  aviso.className = `${clases} text-white text-sm rounded-md shadow-lg px-4 py-3 max-w-sm transition-opacity duration-300 cursor-pointer`;
   aviso.setAttribute('role', 'status');
   aviso.textContent = mensaje;
   aviso.addEventListener('click', () => aviso.remove());
@@ -129,20 +135,20 @@ function avisar(mensaje, tipo = 'exito') {
 // Banner fijo dentro de una vista. El 503 de un motor caído se muestra como
 // advertencia: la pantalla sigue en pie.
 const CLASES_BANNER = {
-  error: 'bg-red-50 border-red-300 text-red-800',
-  advertencia: 'bg-amber-50 border-amber-400 text-amber-900',
-  exito: 'bg-green-50 border-green-400 text-green-800',
-  info: 'bg-blue-50 border-blue-300 text-blue-800',
+  error: 'bg-red-50 border-red-600 text-red-900',
+  advertencia: 'bg-amber-50 border-amber-600 text-amber-900',
+  exito: 'bg-green-50 border-green-600 text-green-900',
+  info: 'bg-white border-blue-600 text-gray-800',
 };
 
 const bannerHtml = (mensaje, tipo = 'info') =>
-  `<div class="border rounded-lg px-4 py-3 text-sm ${CLASES_BANNER[tipo]}" role="alert">${mensaje}</div>`;
+  `<div class="border border-l-4 rounded-md px-4 py-3 text-sm ${CLASES_BANNER[tipo]}" role="alert">${mensaje}</div>`;
 
 const bannerErrorHtml = (error) =>
   bannerHtml(esc(error?.message || 'Ocurrió un error inesperado.'), error?.estado === 503 ? 'advertencia' : 'error');
 
 const filaVacia = (columnas, mensaje = 'Sin registros.') =>
-  `<tr><td colspan="${columnas}" class="px-3 py-4 text-center text-gray-400">${esc(mensaje)}</td></tr>`;
+  `<tr><td colspan="${columnas}" class="px-3 py-6 text-center text-gray-600">${esc(mensaje)}</td></tr>`;
 
 // Desactiva el botón mientras corre la operación: primera línea contra el doble clic.
 async function conCarga(boton, operacion) {
@@ -165,41 +171,102 @@ const ICONO_CERRAR = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fi
 
 function abrirModal(titulo, cuerpoHtml, { alMontar, ampliada = false } = {}) {
   cerrarModal();
+  const previo = document.activeElement;
   capaModal = document.createElement('div');
-  capaModal.className = 'fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/40';
+  capaModal.className = 'capa-modal fixed inset-0 z-40 flex items-center justify-center p-4';
   capaModal.innerHTML = `
-    <div class="bg-white rounded-lg shadow-xl w-full ${ampliada ? 'max-w-3xl' : 'max-w-xl'} max-h-[88vh] flex flex-col" role="dialog" aria-modal="true" aria-label="${esc(titulo)}">
-      <header class="flex items-center justify-between border-b border-gray-200 px-5 py-3 shrink-0">
-        <h2 class="text-lg font-semibold text-gray-800">${esc(titulo)}</h2>
-        <button type="button" data-cerrar class="text-gray-400 hover:text-gray-700" aria-label="Cerrar">${ICONO_CERRAR}</button>
+    <div class="bg-white shadow-2xl w-full ${ampliada ? 'max-w-3xl' : 'max-w-xl'} max-h-[88vh] flex flex-col" role="dialog" aria-modal="true" aria-label="${esc(titulo)}">
+      <header class="flex items-center justify-between border-b border-gray-200 px-6 py-4 shrink-0">
+        <h2 class="text-lg font-bold text-gray-900">${esc(titulo)}</h2>
+        <button type="button" data-cerrar class="text-gray-500 hover:text-gray-900 rounded p-1" aria-label="Cerrar">${ICONO_CERRAR}</button>
       </header>
-      <div class="px-5 py-4 overflow-y-auto"></div>
+      <div class="px-6 py-5 overflow-y-auto"></div>
     </div>`;
   capaModal.querySelector('header ~ div').innerHTML = cuerpoHtml;
   capaModal.querySelector('[data-cerrar]').addEventListener('click', cerrarModal);
+  // Escape también es un cierre explícito; un clic fuera no, para no perder formularios.
+  capaModal.addEventListener('keydown', (evento) => { if (evento.key === 'Escape') cerrarModal(); });
+  capaModal.devolverFoco = previo;
   document.body.appendChild(capaModal);
   if (alMontar) alMontar(capaModal);
+  (capaModal.querySelector('header ~ div input, header ~ div select, header ~ div textarea') ?? capaModal.querySelector('[data-cerrar]')).focus();
   return capaModal;
 }
 
 function cerrarModal() {
-  const capa = capaModal ?? document.querySelector('div.fixed.inset-0.z-40');
-  if (capa) capa.remove();
+  const capa = capaModal ?? document.querySelector('div.capa-modal');
+  if (capa) {
+    capa.remove();
+    if (capa.devolverFoco?.isConnected) capa.devolverFoco.focus();
+  }
   capaModal = null;
 }
 
 // Confirmación modal: devuelve true si el usuario acepta.
-function confirmar(mensaje, { textoBoton = 'Confirmar', titulo = 'Confirmar' } = {}) {
+function confirmar(mensaje, { textoBoton = 'Confirmar', titulo = 'Confirmar', peligro = false } = {}) {
   return new Promise((resolver) => {
     const capa = abrirModal(titulo, `
-      <p class="text-sm text-gray-700">${esc(mensaje)}</p>
-      <div class="mt-5 flex justify-end gap-2">
-        <button type="button" data-cancelar class="px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-        <button type="button" data-aceptar class="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">${esc(textoBoton)}</button>
+      <p class="text-gray-800">${esc(mensaje)}</p>
+      <div class="mt-6 flex justify-end gap-2">
+        <button type="button" data-cancelar class="btn btn-secundario">Volver</button>
+        <button type="button" data-aceptar class="btn ${peligro ? 'btn-peligro-lleno' : 'btn-primario'}">${esc(textoBoton)}</button>
       </div>`);
+    capa.querySelector('[data-aceptar]').focus();
     capa.querySelector('[data-cancelar]').addEventListener('click', () => { cerrarModal(); resolver(false); });
     capa.querySelector('[data-aceptar]').addEventListener('click', () => { cerrarModal(); resolver(true); });
   });
+}
+
+// Pie estándar de un modal: cancelar y la acción principal con su nombre real.
+const pieModalHtml = (textoAccion, { peligro = false } = {}) => `
+  <div class="flex justify-end gap-2 pt-4 mt-2 border-t border-gray-200">
+    <button type="button" data-cancelar class="btn btn-secundario">Cancelar</button>
+    <button type="button" data-guardar class="btn ${peligro ? 'btn-peligro-lleno' : 'btn-primario'}">${esc(textoAccion)}</button>
+  </div>`;
+
+// Encabezado de página: enlace de regreso, título, descripción y acciones.
+const encabezadoHtml = (titulo, { volver, descripcion = '', acciones = '' } = {}) => `
+  <div class="encabezado">
+    ${volver ? `<a href="${esc(volver.href)}" class="volver">${esc(volver.texto)}</a>` : ''}
+    <div class="encabezado-fila">
+      <h1 class="titulo-pagina">${esc(titulo)}</h1>
+      ${acciones ? `<div class="acciones">${acciones}</div>` : ''}
+    </div>
+    ${descripcion ? `<p class="encabezado-desc">${descripcion}</p>` : ''}
+  </div>`;
+
+const vacioHtml = (titulo, detalle = '') =>
+  `<div class="vacio"><strong>${esc(titulo)}</strong>${detalle ? esc(detalle) : ''}</div>`;
+
+const cargandoHtml = (texto = 'Cargando...') => `<p class="cargando" role="status">${esc(texto)}</p>`;
+
+const SEXOS = { M: 'Masculino', F: 'Femenino', O: 'Otro' };
+
+// Carátula del expediente: identifica al paciente en toda vista clínica.
+// alergias: undefined no muestra la franja; [] la muestra como "sin alergias".
+function fichaPacienteHtml(paciente, { alergias, acciones = '', codigo } = {}) {
+  const p = paciente ?? {};
+  const franja = alergias === undefined ? '' : alergias.length
+    ? `<div class="ficha-alergias" data-hay="si" role="note"><strong>Alergias</strong><span>${alergias
+      .map((a) => esc(`${a.sustancia}${a.nivel_gravedad ? ` (${a.nivel_gravedad.toLowerCase()})` : ''}`)).join(', ')}</span></div>`
+    : '<div class="ficha-alergias" data-hay="no">Sin alergias registradas</div>';
+  return `
+    <header class="ficha" data-estado="${esc(p.estado)}">
+      <div class="ficha-cabeza">
+        <h1 class="ficha-nombre">${esc(p.nombres)} ${esc(p.apellidos)}</h1>
+        ${insignia(p.estado)}
+        ${acciones ? `<div class="acciones">${acciones}</div>` : ''}
+      </div>
+      <dl class="ficha-datos">
+        <div><dt>Historial</dt><dd>${o(codigo ?? p.codigo_historial)}</dd></div>
+        <div><dt>Edad</dt><dd>${edadComoTexto(p.fecha_nacimiento)}</dd></div>
+        <div><dt>Nacimiento</dt><dd>${fechaLarga(p.fecha_nacimiento)}</dd></div>
+        <div><dt>Sexo</dt><dd>${o(SEXOS[p.sexo] ?? p.sexo)}</dd></div>
+        <div><dt>Sangre</dt><dd>${o(p.tipo_sangre)}</dd></div>
+        <div><dt>Documento</dt><dd>${o(p.dpi_o_documento)}</dd></div>
+      </dl>
+      ${franja}
+    </header>`;
 }
 
 // Opciones para un <select>.
@@ -251,12 +318,13 @@ function crearSelectorPaciente({ etiqueta = 'Paciente', alElegir, soloActivos = 
     if (estado.elegido) {
       const p = estado.elegido;
       raiz.innerHTML = `
-        <div class="flex items-center justify-between border border-gray-300 rounded-lg px-3 py-2 bg-gray-50">
-          <div>
-            <p class="text-sm font-medium text-gray-800">${esc(p.nombres)} ${esc(p.apellidos)}</p>
-            <p class="text-xs text-gray-500">${o(p.dpi_o_documento)} · ${insignia(p.estado)}</p>
+        <span class="${ETIQUETA}">${esc(etiqueta)}</span>
+        <div class="flex items-center justify-between gap-3 border border-gray-300 border-l-4 border-l-blue-600 rounded-md px-3 py-2 bg-white">
+          <div class="min-w-0">
+            <p class="font-bold text-gray-900 truncate">${esc(p.nombres)} ${esc(p.apellidos)} <span class="ml-1 align-middle">${insignia(p.estado)}</span></p>
+            <p class="text-sm text-gray-600">Documento ${o(p.dpi_o_documento)}, ${edadComoTexto(p.fecha_nacimiento)}</p>
           </div>
-          <button type="button" data-cambiar class="text-sm text-blue-600 hover:text-blue-800">Cambiar</button>
+          <button type="button" data-cambiar class="enlace shrink-0">Cambiar paciente</button>
         </div>`;
       raiz.querySelector('[data-cambiar]').addEventListener('click', () => {
         estado.elegido = null;
@@ -269,9 +337,9 @@ function crearSelectorPaciente({ etiqueta = 'Paciente', alElegir, soloActivos = 
     raiz.innerHTML = `
       <label class="block">
         <span class="${ETIQUETA}">${esc(etiqueta)}</span>
-        <input type="search" placeholder="Busca por nombre, apellido o documento (mínimo 2 letras)" autocomplete="off"
+        <input type="search" placeholder="Nombre, apellido o documento" autocomplete="off"
                class="${CAMPO_TEXTO}">
-        <div data-resultados class="mt-1 divide-y divide-gray-100 border border-gray-200 rounded-lg bg-white hidden"></div>
+        <div data-resultados class="mt-1 divide-y divide-gray-100 border border-gray-300 rounded-md bg-white shadow-lg hidden"></div>
       </label>`;
 
     const entrada = raiz.querySelector('input');
@@ -289,11 +357,14 @@ function crearSelectorPaciente({ etiqueta = 'Paciente', alElegir, soloActivos = 
         if (soloActivos) consulta.estado = 'Activo';
         const respuesta = await api.obtener(`/api/pacientes?${construirConsulta(consulta)}`);
         resultados.innerHTML = respuesta.elementos.length === 0
-          ? '<p class="px-3 py-2 text-sm text-gray-500">Sin resultados.</p>'
+          ? '<p class="px-3 py-2 text-sm text-gray-600">Ningún paciente coincide. Revisa la ortografía o busca por documento.</p>'
           : respuesta.elementos.map((p) => `
-            <button type="button" data-id="${esc(p.id_paciente)}" class="w-full text-left px-3 py-2 hover:bg-blue-50">
-              <span class="text-sm font-medium text-gray-800 block">${esc(p.nombres)} ${esc(p.apellidos)}</span>
-              <span class="text-xs text-gray-500">${o(p.dpi_o_documento)} · ${esc(p.codigo_historial ?? '')} · ${esc(p.estado)}</span>
+            <button type="button" data-id="${esc(p.id_paciente)}" class="w-full text-left px-3 py-2 hover:bg-blue-50 focus:bg-blue-50 flex items-center justify-between gap-3">
+              <span>
+                <span class="font-bold text-gray-900 block">${esc(p.nombres)} ${esc(p.apellidos)}</span>
+                <span class="text-sm text-gray-600">${o(p.codigo_historial)}, documento ${o(p.dpi_o_documento)}</span>
+              </span>
+              ${insignia(p.estado)}
             </button>`).join('');
         resultados.classList.remove('hidden');
         resultados.querySelectorAll('[data-id]').forEach((boton) => {
@@ -335,30 +406,32 @@ function crearSelectorPaciente({ etiqueta = 'Paciente', alElegir, soloActivos = 
 // Tabla de consultas compartida por las vistas de consultas e historial.
 const tablaConsultasHtml = (consultas, { conEnlace = true } = {}) => {
   if (!consultas?.length) {
-    return `<table class="w-full text-sm"><tbody><tr><td class="text-center text-gray-400 py-4">El paciente aún no tiene consultas.</td></tr></tbody></table>`;
+    return `<div class="tabla-marco">${vacioHtml('Aún no hay consultas', ' Registra la primera desde una cita o con "Nueva consulta".')}</div>`;
   }
   return `
-    <table class="w-full text-sm border-collapse">
-      <thead>
-        <tr class="text-left text-xs uppercase text-gray-500 border-b">
-          <th class="px-3 py-2">Fecha</th>
-          <th class="px-3 py-2">Motivo</th>
-          <th class="px-3 py-2">Diagnósticos</th>
-          <th class="px-3 py-2">Estado</th>
-          <th class="px-3 py-2"></th>
-        </tr>
-      </thead>
-      <tbody>
-        ${consultas.map((c) => `
-          <tr class="border-b last:border-0 hover:bg-gray-50">
-            <td class="px-3 py-2 whitespace-nowrap">${fechaHoraLarga(c.fecha_hora)}</td>
-            <td class="px-3 py-2">${o(c.motivo_consulta)}</td>
-            <td class="px-3 py-2 text-gray-600">${c.diagnosticos?.length ?? 0}</td>
-            <td class="px-3 py-2">${insignia(c.estado)}</td>
-            <td class="px-3 py-2 text-right whitespace-nowrap">
-              ${conEnlace ? `<a href="#/consultas?id=${encodeURIComponent(c.id_consulta)}" class="text-blue-600 hover:text-blue-800 text-sm">Ver detalle</a>` : ''}
-            </td>
-          </tr>`).join('')}
-      </tbody>
-    </table>`;
+    <div class="tabla-marco">
+      <table>
+        <thead>
+          <tr>
+            <th class="px-3 py-2">Fecha</th>
+            <th class="px-3 py-2">Motivo</th>
+            <th class="px-3 py-2">Diagnósticos</th>
+            <th class="px-3 py-2">Estado</th>
+            <th class="px-3 py-2"><span class="sr-only">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${consultas.map((c) => `
+            <tr>
+              <td class="px-3 py-2.5 whitespace-nowrap">${fechaHoraLarga(c.fecha_hora)}</td>
+              <td class="px-3 py-2.5">${o(c.motivo_consulta)}</td>
+              <td class="px-3 py-2.5 text-gray-700">${c.diagnosticos?.length ? c.diagnosticos.map((d) => esc(d.nombre_diagnostico)).join(', ') : '—'}</td>
+              <td class="px-3 py-2.5">${insignia(c.estado)}</td>
+              <td class="px-3 py-2.5 text-right whitespace-nowrap">
+                ${conEnlace ? `<a href="#/consultas?id=${encodeURIComponent(c.id_consulta)}" class="enlace">Abrir</a>` : ''}
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
 };

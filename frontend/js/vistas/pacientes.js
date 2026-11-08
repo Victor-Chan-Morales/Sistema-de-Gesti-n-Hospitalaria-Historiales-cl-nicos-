@@ -20,19 +20,25 @@ async function listaPacientes(contenedor) {
   const LIMITE = 20;
 
   contenedor.innerHTML = `
-    <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
-      <h1 class="text-xl font-semibold text-gray-800">Pacientes</h1>
-      <a href="#/pacientes?nuevo=1" class="bg-blue-600 text-white text-sm rounded px-4 py-2 hover:bg-blue-700">Nuevo paciente</a>
-    </div>
-    <form data-busqueda class="flex gap-2 flex-wrap mb-4">
-      <input type="search" data-texto placeholder="Nombre, apellido o documento" class="${CAMPO_TEXTO} flex-1 min-w-52">
-      <select data-estado class="${CAMPO_TEXTO} w-44">
+    ${encabezadoHtml('Pacientes', {
+      descripcion: 'Registro de pacientes de tu institución. Al registrar uno se abre su historial clínico.',
+      acciones: '<a href="#/pacientes?nuevo=1" class="btn btn-primario">Registrar paciente</a>',
+    })}
+    <form data-busqueda class="filtros" role="search">
+      <label class="block flex-1 min-w-56">
+        <span class="${ETIQUETA}">Buscar</span>
+        <input type="search" data-texto placeholder="Nombre, apellido o documento" class="${CAMPO_TEXTO}">
+      </label>
+      <label class="block w-44">
+        <span class="${ETIQUETA}">Estado</span>
+        <select data-estado class="${CAMPO_TEXTO}">
         <option value="">Todos los estados</option>
         <option>Activo</option>
         <option>Archivado</option>
         <option>Inactivo</option>
       </select>
-      <button type="submit" class="bg-gray-800 text-white text-sm rounded px-4 py-2 hover:bg-gray-900">Buscar</button>
+      </label>
+      <button type="submit" class="btn btn-secundario">Buscar</button>
     </form>
     <div id="tabla-pacientes"></div>`;
 
@@ -50,43 +56,39 @@ async function listaPacientes(contenedor) {
       const pagina = respuesta.elementos;
 
       zona.innerHTML = `
-        <div class="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-          <table class="w-full text-sm">
+        <div class="tabla-marco">
+          <table>
             <thead>
-              <tr class="text-left text-xs uppercase text-gray-500 border-b bg-gray-50">
+              <tr>
+                <th class="px-4 py-2">Paciente</th>
                 <th class="px-3 py-2">Historial</th>
-                <th class="px-3 py-2">Paciente</th>
                 <th class="px-3 py-2">Documento</th>
                 <th class="px-3 py-2">Nacimiento</th>
-                <th class="px-3 py-2">Edad</th>
                 <th class="px-3 py-2">Sexo</th>
                 <th class="px-3 py-2">Estado</th>
-                <th class="px-3 py-2"></th>
               </tr>
             </thead>
             <tbody>
               ${pagina.length === 0
-                ? filaVacia(8, 'Sin pacientes que coincidan con la búsqueda.')
+                ? filaVacia(6, estado.texto || estado.estadoPaciente ? 'Ningún paciente coincide con la búsqueda.' : 'Aún no hay pacientes. Registra el primero con "Registrar paciente".')
                 : pagina.map((p) => `
-                  <tr class="border-b last:border-0 hover:bg-gray-50">
-                    <td class="px-3 py-2 font-mono text-xs text-gray-500">${o(p.codigo_historial)}</td>
-                    <td class="px-3 py-2 font-medium text-gray-800">${esc(p.nombres)} ${esc(p.apellidos)}</td>
-                    <td class="px-3 py-2 text-gray-600">${o(p.dpi_o_documento)}</td>
-                    <td class="px-3 py-2 whitespace-nowrap">${fechaLarga(p.fecha_nacimiento)}</td>
-                    <td class="px-3 py-2 text-gray-600">${edadComoTexto(p.fecha_nacimiento)}</td>
-                    <td class="px-3 py-2">${o(p.sexo)}</td>
-                    <td class="px-3 py-2">${insignia(p.estado)}</td>
-                    <td class="px-3 py-2 text-right">
-                      <a href="#/pacientes?id=${encodeURIComponent(p.id_paciente)}" class="text-blue-600 hover:text-blue-800">Ver</a>
+                  <tr>
+                    <td class="px-4 py-2.5">
+                      <a href="#/pacientes?id=${encodeURIComponent(p.id_paciente)}" class="font-bold text-gray-900 hover:text-blue-700 hover:underline">${esc(p.apellidos)}, ${esc(p.nombres)}</a>
                     </td>
+                    <td class="px-3 py-2.5 text-gray-700">${o(p.codigo_historial)}</td>
+                    <td class="px-3 py-2.5 text-gray-700">${o(p.dpi_o_documento)}</td>
+                    <td class="px-3 py-2.5 whitespace-nowrap">${fechaLarga(p.fecha_nacimiento)} <span class="text-gray-500">(${edadComoTexto(p.fecha_nacimiento)})</span></td>
+                    <td class="px-3 py-2.5">${o(SEXOS[p.sexo] ?? p.sexo)}</td>
+                    <td class="px-3 py-2.5">${insignia(p.estado)}</td>
                   </tr>`).join('')}
             </tbody>
           </table>
-          <div class="flex items-center justify-between px-3 py-2 border-t text-sm text-gray-600">
+          <div class="flex items-center justify-between px-4 py-2 border-t border-gray-200 text-sm text-gray-700">
             <span data-contador></span>
             <div class="flex gap-2">
-              <button type="button" data-anterior class="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-40">Anterior</button>
-              <button type="button" data-siguiente class="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-40">Siguiente</button>
+              <button type="button" data-anterior class="btn btn-secundario btn-chico">Anterior</button>
+              <button type="button" data-siguiente class="btn btn-secundario btn-chico">Siguiente</button>
             </div>
           </div>
         </div>`;
@@ -94,7 +96,7 @@ async function listaPacientes(contenedor) {
       const desde = estado.desplazamiento + 1;
       const hasta = Math.min(estado.desplazamiento + LIMITE, estado.total);
       zona.querySelector('[data-contador]').textContent =
-        estado.total === 0 ? 'Sin resultados' : `${desde}–${hasta} de ${estado.total}`;
+        estado.total === 0 ? 'Sin resultados' : `${desde} a ${hasta} de ${estado.total} pacientes`;
       zona.querySelector('[data-anterior]').disabled = estado.desplazamiento === 0;
       zona.querySelector('[data-siguiente]').disabled = estado.desplazamiento + LIMITE >= estado.total;
 
@@ -131,23 +133,23 @@ const TIPOS_TELEFONO_CONTACTO = ['Celular', 'Casa'];
 const TIPOS_SANGRE = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 const filaTelefonoHtml = (telefono = {}, tipos = TIPOS_TELEFONO) => `
-  <div class="fila-telefono flex gap-2 mb-2">
-    <input type="tel" data-numero value="${esc(telefono.numero ?? '')}" placeholder="Número" maxlength="20" class="${CAMPO_TEXTO_CORTO} w-40">
-    <select data-tipo class="${CAMPO_TEXTO_CORTO} w-32">
+  <div class="fila-telefono flex gap-2 mb-2 items-center">
+    <input type="tel" data-numero value="${esc(telefono.numero ?? '')}" placeholder="Número" aria-label="Número de teléfono" maxlength="20" class="${CAMPO_TEXTO_CORTO} w-44">
+    <select data-tipo aria-label="Tipo de teléfono" class="${CAMPO_TEXTO_CORTO} w-32">
       <option value="">Tipo</option>
       ${tipos.map((t) => `<option ${telefono.tipo === t ? 'selected' : ''}>${t}</option>`).join('')}
     </select>
-    <button type="button" data-quitar-fila class="text-red-600 hover:text-red-800 text-sm px-2">Quitar</button>
+    <button type="button" data-quitar-fila class="enlace-quitar px-2">Quitar</button>
   </div>`;
 
 const filaCorreoHtml = (correo = {}) => `
-  <div class="fila-correo flex gap-2 mb-2">
-    <input type="email" data-correo value="${esc(correo.correo ?? '')}" placeholder="correo@ejemplo.com" maxlength="100" class="${CAMPO_TEXTO_CORTO} flex-1">
-    <button type="button" data-quitar-fila class="text-red-600 hover:text-red-800 text-sm px-2">Quitar</button>
+  <div class="fila-correo flex gap-2 mb-2 items-center">
+    <input type="email" data-correo value="${esc(correo.correo ?? '')}" placeholder="correo@ejemplo.com" aria-label="Correo electrónico" maxlength="100" class="${CAMPO_TEXTO_CORTO} flex-1 max-w-sm">
+    <button type="button" data-quitar-fila class="enlace-quitar px-2">Quitar</button>
   </div>`;
 
 const tarjetaContactoHtml = (contacto = {}, { representante = false } = {}) => `
-  <div class="${representante ? 'tarjeta-representante' : 'tarjeta-contacto'} border border-gray-200 rounded-lg p-3 mb-2 bg-gray-50">
+  <div class="${representante ? 'tarjeta-representante' : 'tarjeta-contacto'} renglon">
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
       <input type="text" data-nombres value="${esc(contacto.nombres ?? '')}" placeholder="Nombres *" maxlength="100" class="${CAMPO_TEXTO_CORTO}">
       <input type="text" data-apellidos value="${esc(contacto.apellidos ?? '')}" placeholder="Apellidos *" maxlength="100" class="${CAMPO_TEXTO_CORTO}">
@@ -155,96 +157,93 @@ const tarjetaContactoHtml = (contacto = {}, { representante = false } = {}) => `
       ${representante ? `<input type="text" data-dpi value="${esc(contacto.dpi ?? '')}" placeholder="DPI" maxlength="50" class="${CAMPO_TEXTO_CORTO}">` : ''}
       <input type="text" data-direccion value="${esc(contacto.direccion ?? '')}" placeholder="Dirección" maxlength="200" class="${CAMPO_TEXTO_CORTO} sm:col-span-2">
     </div>
-    <p class="text-xs text-gray-500 mb-1">Teléfonos</p>
+    <p class="text-sm font-bold text-gray-700 mb-1">Teléfonos</p>
     <div data-telefonos>${(contacto.telefonos ?? []).map((t) => filaTelefonoHtml(t, TIPOS_TELEFONO_CONTACTO)).join('')}</div>
     <div class="flex gap-2 mb-1">
-      <button type="button" data-agregar-telefono class="text-sm text-blue-600 hover:text-blue-800">Agregar teléfono</button>
-      <button type="button" data-quitar-fila class="text-red-600 hover:text-red-800 text-sm ml-auto">Quitar ${representante ? 'representante' : 'contacto'}</button>
+      <button type="button" data-agregar-telefono class="enlace">Añadir teléfono</button>
+      <button type="button" data-quitar-fila class="enlace-quitar ml-auto">Quitar ${representante ? 'representante' : 'contacto'}</button>
     </div>
     ${representante ? `
-      <p class="text-xs text-gray-500 mb-1">Correos</p>
+      <p class="text-sm font-bold text-gray-700 mb-1">Correos</p>
       <div data-correos>${(contacto.correos ?? []).map(filaCorreoHtml).join('')}</div>
-      <button type="button" data-agregar-correo class="text-sm text-blue-600 hover:text-blue-800">Agregar correo</button>` : ''}
+      <button type="button" data-agregar-correo class="enlace">Añadir correo</button>` : ''}
   </div>`;
+
+const campo = (etiqueta, control, extra = '') =>
+  `<label class="block ${extra}"><span class="${ETIQUETA}">${etiqueta}</span>${control}</label>`;
 
 const formPacienteHtml = (paciente) => {
   const p = paciente ?? {};
+  const texto = (nombre, max, requerido = false) =>
+    `<input type="text" data-campo="${nombre}" ${requerido ? 'required' : ''} maxlength="${max}" value="${esc(p[nombre] ?? '')}" class="${CAMPO_TEXTO}">`;
   return `
-  <form data-formulario class="space-y-4">
-    <section class="bg-white rounded-lg border border-gray-200 p-4">
-      <h2 class="font-semibold text-gray-800 mb-3">Datos personales</h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <label class="block">
-          <span class="${ETIQUETA}">Nombres *</span>
-          <input type="text" data-campo="nombres" required maxlength="100" value="${esc(p.nombres ?? '')}" class="${CAMPO_TEXTO}">
-        </label>
-        <label class="block">
-          <span class="${ETIQUETA}">Apellidos *</span>
-          <input type="text" data-campo="apellidos" required maxlength="100" value="${esc(p.apellidos ?? '')}" class="${CAMPO_TEXTO}">
-        </label>
-        <label class="block">
-          <span class="${ETIQUETA}">DPI o documento</span>
-          <input type="text" data-campo="dpi_o_documento" maxlength="50" value="${esc(p.dpi_o_documento ?? '')}" class="${CAMPO_TEXTO}">
-        </label>
-        <label class="block">
-          <span class="${ETIQUETA}">Fecha de nacimiento *</span>
-          <input type="date" data-campo="fecha_nacimiento" required value="${esc(p.fecha_nacimiento ?? '')}" class="${CAMPO_TEXTO}">
-        </label>
-        <label class="block">
-          <span class="${ETIQUETA}">Sexo</span>
-          <select data-campo="sexo" class="${CAMPO_TEXTO}">
+  <form data-formulario>
+    <section class="form-bloque">
+      <header>
+        <h2>Identificación</h2>
+        <p>Nombre, documento y fecha de nacimiento son los datos con que se encuentra el expediente.</p>
+      </header>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        ${campo('Nombres *', texto('nombres', 100, true))}
+        ${campo('Apellidos *', texto('apellidos', 100, true))}
+        ${campo('DPI o documento', texto('dpi_o_documento', 50))}
+        ${campo('Fecha de nacimiento *', `<input type="date" data-campo="fecha_nacimiento" required max="${hoy()}" value="${esc(p.fecha_nacimiento ?? '')}" class="${CAMPO_TEXTO}">`)}
+        ${campo('Sexo', `<select data-campo="sexo" class="${CAMPO_TEXTO}">
             <option value="">Sin especificar</option>
-            ${['M', 'F', 'O'].map((s) => `<option value="${s}" ${p.sexo === s ? 'selected' : ''}>${s === 'M' ? 'Masculino' : s === 'F' ? 'Femenino' : 'Otro'}</option>`).join('')}
-          </select>
-        </label>
-        <label class="block">
-          <span class="${ETIQUETA}">Tipo de sangre</span>
-          <select data-campo="tipo_sangre" class="${CAMPO_TEXTO}">
+            ${Object.entries(SEXOS).map(([valor, nombre]) => `<option value="${valor}" ${p.sexo === valor ? 'selected' : ''}>${nombre}</option>`).join('')}
+          </select>`)}
+        ${campo('Tipo de sangre', `<select data-campo="tipo_sangre" class="${CAMPO_TEXTO}">
             <option value="">Sin especificar</option>
             ${TIPOS_SANGRE.map((t) => `<option value="${t}" ${p.tipo_sangre === t ? 'selected' : ''}>${t}</option>`).join('')}
-          </select>
-        </label>
-        <label class="block">
-          <span class="${ETIQUETA}">Estado civil</span>
-          <input type="text" data-campo="estado_civil" maxlength="50" value="${esc(p.estado_civil ?? '')}" class="${CAMPO_TEXTO}">
-        </label>
-        <label class="block">
-          <span class="${ETIQUETA}">Ocupación</span>
-          <input type="text" data-campo="ocupacion" maxlength="100" value="${esc(p.ocupacion ?? '')}" class="${CAMPO_TEXTO}">
-        </label>
-        <label class="block sm:col-span-2 lg:col-span-3">
-          <span class="${ETIQUETA}">Dirección</span>
-          <input type="text" data-campo="direccion" maxlength="200" value="${esc(p.direccion ?? '')}" class="${CAMPO_TEXTO}">
-        </label>
+          </select>`)}
+        ${campo('Estado civil', texto('estado_civil', 50))}
+        ${campo('Ocupación', texto('ocupacion', 100))}
+        ${campo('Dirección', texto('direccion', 200), 'sm:col-span-2 lg:col-span-3')}
       </div>
     </section>
 
-    <section class="bg-white rounded-lg border border-gray-200 p-4">
-      <h2 class="font-semibold text-gray-800 mb-3">Teléfonos</h2>
-      <div data-coleccion-telefonos>${(p.telefonos ?? []).map((t) => filaTelefonoHtml(t)).join('')}</div>
-      <button type="button" data-agregar="telefono" class="text-sm text-blue-600 hover:text-blue-800">Agregar teléfono</button>
+    <section class="form-bloque">
+      <header>
+        <h2>Contacto</h2>
+        <p>Teléfonos y correos del propio paciente.</p>
+      </header>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <p class="${ETIQUETA}">Teléfonos</p>
+          <div data-coleccion-telefonos>${(p.telefonos ?? []).map((t) => filaTelefonoHtml(t)).join('')}</div>
+          <button type="button" data-agregar="telefono" class="enlace">Añadir teléfono</button>
+        </div>
+        <div>
+          <p class="${ETIQUETA}">Correos</p>
+          <div data-coleccion-correos>${(p.correos ?? []).map(filaCorreoHtml).join('')}</div>
+          <button type="button" data-agregar="correo" class="enlace">Añadir correo</button>
+        </div>
+      </div>
     </section>
 
-    <section class="bg-white rounded-lg border border-gray-200 p-4">
-      <h2 class="font-semibold text-gray-800 mb-3">Correos</h2>
-      <div data-coleccion-correos>${(p.correos ?? []).map(filaCorreoHtml).join('')}</div>
-      <button type="button" data-agregar="correo" class="text-sm text-blue-600 hover:text-blue-800">Agregar correo</button>
+    <section class="form-bloque">
+      <header>
+        <h2>Contactos de emergencia</h2>
+        <p>A quién llamar si el paciente no puede responder.</p>
+      </header>
+      <div>
+        <div data-coleccion-contactos>${(p.contactos_emergencia ?? []).map((c) => tarjetaContactoHtml(c)).join('')}</div>
+        <button type="button" data-agregar="contacto" class="enlace">Añadir contacto de emergencia</button>
+      </div>
     </section>
 
-    <section class="bg-white rounded-lg border border-gray-200 p-4">
-      <h2 class="font-semibold text-gray-800 mb-3">Contactos de emergencia</h2>
-      <div data-coleccion-contactos>${(p.contactos_emergencia ?? []).map((c) => tarjetaContactoHtml(c)).join('')}</div>
-      <button type="button" data-agregar="contacto" class="text-sm text-blue-600 hover:text-blue-800">Agregar contacto</button>
+    <section class="form-bloque">
+      <header>
+        <h2>Representantes legales</h2>
+        <p>Obligatorio para menores de 18 años: al menos un representante.</p>
+      </header>
+      <div>
+        <div data-coleccion-representantes>${(p.representantes ?? []).map((r) => tarjetaContactoHtml(r, { representante: true })).join('')}</div>
+        <button type="button" data-agregar="representante" class="enlace">Añadir representante</button>
+      </div>
     </section>
 
-    <section class="bg-white rounded-lg border border-gray-200 p-4">
-      <h2 class="font-semibold text-gray-800 mb-3">Representantes legales</h2>
-      <p class="text-sm text-gray-500 mb-3">Los menores de 18 años requieren al menos un representante.</p>
-      <div data-coleccion-representantes>${(p.representantes ?? []).map((r) => tarjetaContactoHtml(r, { representante: true })).join('')}</div>
-      <button type="button" data-agregar="representante" class="text-sm text-blue-600 hover:text-blue-800">Agregar representante</button>
-    </section>
-
-    <div class="flex gap-2" data-acciones></div>
+    <div class="form-pie" data-acciones></div>
   </form>`;
 };
 
@@ -355,18 +354,18 @@ function leerPaciente(formulario) {
 async function formularioPaciente(contenedor, paciente) {
   const nuevo = !paciente;
   contenedor.innerHTML = `
-    <div class="mb-4">
-      <a href="#/pacientes" class="text-sm text-blue-600 hover:text-blue-800">&larr; Volver al listado</a>
-      <h1 class="text-xl font-semibold text-gray-800 mt-1">${nuevo ? 'Nuevo paciente' : 'Editar paciente'}</h1>
-      ${nuevo ? '' : `<p class="text-sm text-gray-500">${esc(paciente.nombres)} ${esc(paciente.apellidos)} · ${o(paciente.codigo_historial)} ${insignia(paciente.estado)}</p>`}
-    </div>
+    ${encabezadoHtml(nuevo ? 'Registrar paciente' : 'Editar paciente', {
+      volver: { href: '#/pacientes', texto: 'Pacientes' },
+      descripcion: nuevo ? 'Los campos con asterisco son obligatorios. El historial clínico se abre al guardar.' : '',
+    })}
     ${formPacienteHtml(paciente)}`;
 
   const formulario = contenedor.querySelector('[data-formulario]');
   activarColecciones(formulario);
   formulario.querySelector('[data-acciones]').innerHTML = `
-    <button type="submit" data-guardar class="bg-blue-600 text-white text-sm rounded px-4 py-2 hover:bg-blue-700">${nuevo ? 'Registrar paciente' : 'Guardar cambios'}</button>
-    <a href="#/pacientes" class="border border-gray-300 text-gray-700 text-sm rounded px-4 py-2 hover:bg-gray-50">Cancelar</a>`;
+    <button type="submit" data-guardar class="btn btn-primario">${nuevo ? 'Registrar paciente' : 'Guardar cambios'}</button>
+    <a href="#/pacientes" class="btn btn-secundario">Cancelar</a>`;
+  formulario.querySelector('[data-campo="nombres"]').focus();
 
   formulario.addEventListener('submit', async (evento) => {
     evento.preventDefault();
@@ -401,28 +400,28 @@ async function detallePaciente(contenedor, id) {
   const puedeVerHistorial = tienePermiso(usuario.rol, PERMISOS.VER_HISTORIAL_CLINICO);
   const puedeArchivar = tienePermiso(usuario.rol, PERMISOS.ARCHIVAR_PACIENTES) && paciente.estado === 'Activo';
 
+  const idUrl = encodeURIComponent(id);
+  const activo = paciente.estado === 'Activo';
+  const acciones = [
+    `<a href="#/citas?paciente=${idUrl}" class="btn btn-secundario">Ver citas</a>`,
+    puedeVerHistorial ? `<a href="#/historial?paciente=${idUrl}" class="btn btn-secundario">Abrir historial</a>` : '',
+    puedeVerHistorial && activo ? `<a href="#/consultas?paciente=${idUrl}" class="btn btn-primario">Nueva consulta</a>` : '',
+  ].join('');
+
   contenedor.innerHTML = `
-    <div class="mb-4">
-      <a href="#/pacientes" class="text-sm text-blue-600 hover:text-blue-800">&larr; Volver al listado</a>
+    <a href="#/pacientes" class="volver">Pacientes</a>
+    ${fichaPacienteHtml(paciente, { acciones })}
+    ${activo ? '' : `<div class="mb-6">${bannerHtml(`Expediente ${esc(paciente.estado.toLowerCase())}${paciente.motivo_baja ? `: ${esc(paciente.motivo_baja)}` : ''}. No recibe citas ni datos clínicos nuevos.`, 'info')}</div>`}
+    <div class="seccion-cabeza">
+      <h2 class="titulo-seccion">Datos del registro</h2>
+      ${puedeArchivar ? '<button type="button" data-archivar class="btn btn-peligro btn-chico">Dar de baja</button>' : ''}
     </div>
-    <div class="flex items-center gap-2 flex-wrap mb-4">
-      <h1 class="text-xl font-semibold text-gray-800">${esc(paciente.nombres)} ${esc(paciente.apellidos)}</h1>
-      ${insignia(paciente.estado)}
-      <span class="text-sm text-gray-500">${edadComoTexto(paciente.fecha_nacimiento)}</span>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
-      <a href="#/citas?paciente=${encodeURIComponent(id)}" class="text-center bg-white border border-gray-200 rounded-lg px-4 py-3 text-sm text-blue-700 hover:border-blue-400">Citas del paciente</a>
-      ${puedeVerHistorial ? `
-        <a href="#/historial?paciente=${encodeURIComponent(id)}" class="text-center bg-white border border-gray-200 rounded-lg px-4 py-3 text-sm text-blue-700 hover:border-blue-400">Historial clínico</a>
-        <a href="#/consultas?paciente=${encodeURIComponent(id)}" class="text-center bg-white border border-gray-200 rounded-lg px-4 py-3 text-sm text-blue-700 hover:border-blue-400">Nueva consulta</a>` : ''}
-    </div>
-    ${puedeArchivar ? `<button type="button" data-archivar class="mb-4 border border-red-300 text-red-700 text-sm rounded px-4 py-2 hover:bg-red-50">Archivar o dar de baja</button>` : ''}
     ${formPacienteHtml(paciente)}`;
 
   const formulario = contenedor.querySelector('[data-formulario]');
   activarColecciones(formulario);
   formulario.querySelector('[data-acciones]').innerHTML =
-    `<button type="submit" data-guardar class="bg-blue-600 text-white text-sm rounded px-4 py-2 hover:bg-blue-700">Guardar cambios</button>`;
+    `<button type="submit" data-guardar class="btn btn-primario">Guardar cambios</button>`;
 
   formulario.addEventListener('submit', async (evento) => {
     evento.preventDefault();
@@ -435,8 +434,10 @@ async function detallePaciente(contenedor, id) {
     }
     try {
       await conCarga(boton, async () => {
-        await api.actualizar(`/api/pacientes/${encodeURIComponent(id)}`, cuerpo);
+        const guardado = await api.actualizar(`/api/pacientes/${encodeURIComponent(id)}`, cuerpo);
+        recordarPaciente(guardado);
         avisar('Cambios guardados.');
+        contenedor.querySelector('.ficha').outerHTML = fichaPacienteHtml(guardado, { acciones });
       });
     } catch (error) {
       avisar(error.message, 'error');
@@ -446,37 +447,32 @@ async function detallePaciente(contenedor, id) {
   const botonArchivar = contenedor.querySelector('[data-archivar]');
   if (!botonArchivar) return;
 
-  botonArchivar.addEventListener('click', async () => {
-    const acepta = await confirmar(
-      'El paciente dejará de recibir citas nuevas y su historial se archiva junto con el registro.',
-      { textoBoton: 'Archivar', titulo: 'Archivar paciente' },
-    );
-    if (!acepta) return;
-
-    const capa = abrirModal('Archivar paciente', `
-      <label class="block mb-3">
-        <span class="${ETIQUETA}">Estado final *</span>
-        <select data-estado class="${CAMPO_TEXTO}">
-          <option value="Archivado">Archivado</option>
-          <option value="Inactivo">Inactivo</option>
-        </select>
-      </label>
-      <label class="block mb-3">
-        <span class="${ETIQUETA}">Motivo *</span>
-        <textarea data-motivo rows="2" maxlength="255" class="${CAMPO_TEXTO}"></textarea>
-      </label>
-      <div class="flex justify-end gap-2">
-        <button type="button" data-cancelar class="px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-        <button type="button" data-confirmar class="px-4 py-2 rounded bg-red-600 text-white text-sm hover:bg-red-700">Guardar baja</button>
-      </div>`);
+  botonArchivar.addEventListener('click', () => {
+    const capa = abrirModal('Dar de baja al paciente', `
+      <p class="text-gray-800 mb-4">${esc(paciente.nombres)} ${esc(paciente.apellidos)} dejará de recibir citas y datos clínicos nuevos. Su historial se cierra, pero no se borra: queda disponible para consulta.</p>
+      <div class="space-y-4">
+        <label class="block">
+          <span class="${ETIQUETA}">Estado final *</span>
+          <select data-estado class="${CAMPO_TEXTO}">
+            <option value="Archivado">Archivado (traslado o fallecimiento)</option>
+            <option value="Inactivo">Inactivo (otra causa administrativa)</option>
+          </select>
+        </label>
+        <label class="block">
+          <span class="${ETIQUETA}">Motivo *</span>
+          <textarea data-motivo rows="3" maxlength="255" placeholder="Por ejemplo: traslado al Hospital Regional" class="${CAMPO_TEXTO}"></textarea>
+        </label>
+      </div>
+      ${pieModalHtml('Dar de baja', { peligro: true })}`);
     capa.querySelector('[data-cancelar]').addEventListener('click', cerrarModal);
-    capa.querySelector('[data-confirmar]').addEventListener('click', async (evento) => {
+    capa.querySelector('[data-guardar]').addEventListener('click', async (evento) => {
       const cuerpo = {
         estado: capa.querySelector('[data-estado]').value,
         motivo: capa.querySelector('[data-motivo]').value.trim(),
       };
       if (!cuerpo.motivo) {
         avisar('Escribe el motivo de la baja.', 'advertencia');
+        capa.querySelector('[data-motivo]').focus();
         return;
       }
       try {
@@ -484,7 +480,7 @@ async function detallePaciente(contenedor, id) {
           await api.crear(`/api/pacientes/${encodeURIComponent(id)}/archivar`, cuerpo);
           cerrarModal();
           avisar('Paciente dado de baja.');
-          window.location.hash = '#/pacientes';
+          await detallePaciente(contenedor, id);
         });
       } catch (error) {
         avisar(error.message, 'error');

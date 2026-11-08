@@ -4,25 +4,33 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panel - Red de hospitales</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script src="js/tema.js"></script>
+  <link rel="stylesheet" href="css/clinico.css">
 </head>
-<body class="min-h-screen bg-gray-100">
-  <div id="avisos" class="fixed top-4 right-4 z-50 flex flex-col gap-2 items-end"></div>
+<body>
+  <div id="avisos" class="fixed top-4 right-4 z-50 flex flex-col gap-2 items-end" aria-live="polite"></div>
 
-  <header class="bg-white border-b border-gray-200 sticky top-0 z-30">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3 flex-wrap">
-      <span class="text-lg font-bold text-blue-700">Red de hospitales</span>
-      <span id="institucion" class="text-sm text-gray-500"></span>
-      <div class="flex-1"></div>
-      <div id="datos-usuario" class="text-right"></div>
-      <button id="salir" type="button" class="border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">Salir</button>
-    </div>
-    <nav id="navegacion" class="max-w-6xl mx-auto px-4 flex gap-1 overflow-x-auto"></nav>
-  </header>
+  <div class="marco">
+    <aside class="lateral">
+      <div class="marca">
+        <p class="marca-nombre">Red de hospitales</p>
+        <p id="institucion" class="marca-institucion"></p>
+      </div>
+      <nav id="navegacion" class="nav" aria-label="Secciones"></nav>
+      <div class="usuario">
+        <div id="datos-usuario"></div>
+        <button id="salir" type="button" class="enlace mt-2">Cerrar sesión</button>
+      </div>
+    </aside>
 
-  <main class="max-w-6xl mx-auto p-4">
-    <div id="vista"></div>
-  </main>
+    <main class="contenido">
+      <div id="vista"></div>
+    </main>
+  </div>
 
   <script src="js/sesion.js"></script>
   <script src="js/api.js"></script>

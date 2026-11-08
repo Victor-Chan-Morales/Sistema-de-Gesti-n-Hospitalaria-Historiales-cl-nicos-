@@ -21,11 +21,13 @@ async function vistaLaboratorio(contenedor, params) {
   const estado = { ordenes: [], filtroEstado: '', filtroPaciente: null, tipoVista: 'lista', orden: null };
 
   contenedor.innerHTML = `
-    <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
-      <h1 class="text-xl font-semibold text-gray-800">Órdenes de laboratorio</h1>
-      ${puedeRegistrar ? '<button type="button" data-nueva-orden class="bg-blue-600 text-white text-sm rounded px-4 py-2 hover:bg-blue-700">Nueva orden</button>' : ''}
+    <div data-cabecera-lista>
+      ${encabezadoHtml('Órdenes de laboratorio', {
+        descripcion: 'Cada orden agrupa uno o varios exámenes. Al registrar todos los resultados, la orden pasa a finalizada.',
+        acciones: puedeRegistrar ? '<button type="button" data-nueva-orden class="btn btn-primario">Nueva orden</button>' : '',
+      })}
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white border border-gray-200 rounded-lg p-4 mb-4" data-filtros-lista>
+    <div class="filtros grid grid-cols-1 sm:grid-cols-3 !items-end" data-filtros-lista>
       <div data-espacio-paciente class="sm:col-span-2"></div>
       <label class="block">
         <span class="${ETIQUETA}">Estado</span>
@@ -50,7 +52,9 @@ async function vistaLaboratorio(contenedor, params) {
   async function cargarLista() {
     estado.tipoVista = 'lista';
     const zona = contenedor.querySelector('#zona-laboratorio');
-    zona.innerHTML = '<p class="text-sm text-gray-500 py-6 text-center">Cargando órdenes...</p>';
+    contenedor.querySelector('[data-cabecera-lista]').hidden = false;
+    contenedor.querySelector('[data-filtros-lista]').hidden = false;
+    zona.innerHTML = cargandoHtml('Cargando órdenes...');
     try {
       const consulta = construirConsulta({
         estado: estado.filtroEstado,
@@ -63,32 +67,32 @@ async function vistaLaboratorio(contenedor, params) {
       estado.ordenes = ordenes;
 
       zona.innerHTML = `
-        <div class="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-          <table class="w-full text-sm">
+        <div class="tabla-marco">
+          <table>
             <thead>
-              <tr class="text-left text-xs uppercase text-gray-500 border-b bg-gray-50">
-                <th class="px-3 py-2">Fecha</th>
+              <tr>
+                <th class="px-4 py-2">Fecha</th>
                 <th class="px-3 py-2">Paciente</th>
                 <th class="px-3 py-2">Exámenes</th>
                 <th class="px-3 py-2">Resultados</th>
                 <th class="px-3 py-2">Prioridad</th>
                 <th class="px-3 py-2">Estado</th>
-                <th class="px-3 py-2"></th>
+                <th class="px-3 py-2"><span class="sr-only">Acciones</span></th>
               </tr>
             </thead>
             <tbody>
               ${ordenes.length === 0
-                ? filaVacia(7, 'Sin órdenes con estos filtros.')
+                ? filaVacia(7, estado.filtroEstado || estado.filtroPaciente ? 'Ninguna orden coincide con estos filtros.' : 'Aún no hay órdenes. Crea la primera con "Nueva orden".')
                 : ordenes.map((orden) => `
-                  <tr class="border-b last:border-0 hover:bg-gray-50" data-id="${esc(orden.id_orden_laboratorio)}">
-                    <td class="px-3 py-2 whitespace-nowrap">${fechaHoraLarga(orden.fecha_orden)}</td>
-                    <td class="px-3 py-2 font-medium text-gray-800">${esc(nombreDePaciente(nombres, orden.id_paciente))}</td>
-                    <td class="px-3 py-2 text-gray-600">${(orden.examenes ?? []).length}</td>
-                    <td class="px-3 py-2 text-gray-600">${(orden.resultados ?? []).length}/${orden.examenes.length}</td>
-                    <td class="px-3 py-2">${insignia(orden.prioridad)}</td>
-                    <td class="px-3 py-2">${insignia(orden.estado)}</td>
-                    <td class="px-3 py-2 text-right">
-                      <button type="button" data-ver class="text-blue-600 hover:text-blue-800 text-sm">Ver</button>
+                  <tr data-id="${esc(orden.id_orden_laboratorio)}">
+                    <td class="px-4 py-2.5 whitespace-nowrap">${fechaHoraLarga(orden.fecha_orden)}</td>
+                    <td class="px-3 py-2.5 font-bold">${esc(nombreDePaciente(nombres, orden.id_paciente))}</td>
+                    <td class="px-3 py-2.5 text-gray-700 max-w-xs">${(orden.examenes ?? []).map((e) => esc(e.nombre)).join(', ')}</td>
+                    <td class="px-3 py-2.5 whitespace-nowrap">${(orden.resultados ?? []).length} de ${(orden.examenes ?? []).length}</td>
+                    <td class="px-3 py-2.5">${insignia(orden.prioridad)}</td>
+                    <td class="px-3 py-2.5">${insignia(orden.estado)}</td>
+                    <td class="px-3 py-2.5 text-right">
+                      <button type="button" data-ver class="enlace">Abrir</button>
                     </td>
                   </tr>`).join('')}
             </tbody>
@@ -115,68 +119,72 @@ async function vistaLaboratorio(contenedor, params) {
 
     const resultadoDe = (idTipo) => (orden.resultados ?? []).find((r) => String(r.id_tipo_examen) === String(idTipo));
 
+    contenedor.querySelector('[data-cabecera-lista]').hidden = true;
+    contenedor.querySelector('[data-filtros-lista]').hidden = true;
+    const completos = (orden.resultados ?? []).length;
+    const total = (orden.examenes ?? []).length;
+
     zona.innerHTML = `
+      <button type="button" data-volver class="volver">Órdenes de laboratorio</button>
       ${advertencias.length ? `<div class="mb-4">${bannerHtml(advertencias.map((a) => esc(a)).join('<br>'), 'advertencia')}</div>` : ''}
-      <button type="button" data-volver class="text-sm text-blue-600 hover:text-blue-800 mb-2">&larr; Volver a las órdenes</button>
-      <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-4">
-        <div class="bg-white border border-gray-200 rounded-lg p-4">
-          <p class="text-xs text-gray-500">Paciente</p>
-          <p class="font-medium text-gray-800">${esc(nombreDePaciente(nombres, orden.id_paciente))}</p>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-lg p-4">
-          <p class="text-xs text-gray-500">Fecha de la orden</p>
-          <p class="font-medium text-gray-800">${fechaHoraLarga(orden.fecha_orden)}</p>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-lg p-4">
-          <p class="text-xs text-gray-500">Prioridad</p>
-          <p class="font-medium text-gray-800">${insignia(orden.prioridad)}</p>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-lg p-4">
-          <p class="text-xs text-gray-500">Estado</p>
-          <p class="font-medium text-gray-800">${insignia(orden.estado)}</p>
+      <div class="encabezado">
+        <div class="encabezado-fila">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h1 class="titulo-pagina">Orden de ${esc(nombreDePaciente(nombres, orden.id_paciente))}</h1>
+            ${insignia(orden.estado)}
+          </div>
+          ${puedeRegistrar && transiciones.length ? `<div class="acciones">
+            ${transiciones.map((t) => t === 'Cancelada'
+              ? `<button type="button" data-transicion="${esc(t)}" class="btn btn-peligro">Cancelar orden</button>`
+              : `<button type="button" data-transicion="${esc(t)}" class="btn btn-primario">${esc(t === 'Entregada' ? 'Marcar entregada' : t === 'En proceso' ? 'Iniciar proceso' : `Pasar a ${t.toLowerCase()}`)}</button>`).join('')}
+          </div>` : ''}
         </div>
       </div>
-      ${orden.observaciones ? `<div class="mb-4">${bannerHtml(esc(orden.observaciones), 'info')}</div>` : ''}
-      ${puedeRegistrar && transiciones.length ? `
-        <div class="flex gap-2 mb-4">
-          ${transiciones.map((t) => t === 'Cancelada'
-            ? `<button type="button" data-transicion="${esc(t)}" class="border border-red-300 text-red-700 text-sm rounded px-3 py-2 hover:bg-red-50">Cancelar orden</button>`
-            : `<button type="button" data-transicion="${esc(t)}" class="bg-blue-600 text-white text-sm rounded px-3 py-2 hover:bg-blue-700">${esc(t === 'Entregada' ? 'Marcar entregada' : t)}</button>`).join('')}
-        </div>` : ''}
-      <div class="space-y-3">
+      <dl class="datos border-y border-gray-200 py-4 mb-6">
+        <div><dt>Fecha de la orden</dt><dd>${fechaHoraLarga(orden.fecha_orden)}</dd></div>
+        <div><dt>Prioridad</dt><dd>${insignia(orden.prioridad)}</dd></div>
+        <div><dt>Resultados</dt><dd>${completos} de ${total} exámenes</dd></div>
+        ${orden.observaciones ? `<div class="col-span-full"><dt>Observaciones</dt><dd class="!font-normal">${esc(orden.observaciones)}</dd></div>` : ''}
+      </dl>
+      <div class="space-y-6">
         ${(orden.examenes ?? []).map((examen) => {
           const resultado = resultadoDe(examen.id_tipo_examen);
           return `
-          <section class="bg-white rounded-lg border border-gray-200 p-4">
-            <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+          <section class="tabla-marco">
+            <div class="flex items-center justify-between gap-3 flex-wrap px-4 py-3 border-b border-gray-200">
               <div>
-                <h3 class="font-semibold text-gray-800">${esc(examen.nombre)}</h3>
-                <p class="text-xs text-gray-500">Muestra: ${o(examen.tipo_muestra)}</p>
+                <h2 class="font-bold text-lg">${esc(examen.nombre)}</h2>
+                <p class="text-sm text-gray-600">Muestra: ${o(examen.tipo_muestra)}</p>
               </div>
-              ${resultado ? insignia('Finalizada', 'resultado-existe') : `<span class="text-xs text-amber-700 bg-amber-50 rounded-full px-2.5 py-0.5">Sin resultado</span>`}
-              ${puedeRegistrar && !resultado && orden.estado !== 'Cancelada' ? `<button type="button" data-registrar="${esc(examen.id_tipo_examen)}" class="text-sm bg-blue-600 text-white rounded px-3 py-1.5 hover:bg-blue-700">Registrar resultado</button>` : ''}
+              ${resultado
+                ? `<p class="text-sm text-gray-700 resultado-existe">Resultado del ${fechaLarga(resultado.fecha_resultado)}</p>`
+                : puedeRegistrar && orden.estado !== 'Cancelada'
+                  ? `<button type="button" data-registrar="${esc(examen.id_tipo_examen)}" class="btn btn-primario btn-chico">Registrar resultado</button>`
+                  : '<span class="text-sm text-amber-800">Sin resultado</span>'}
             </div>
             ${resultado ? `
-              <div class="text-sm text-gray-700">
-                <p><span class="text-gray-500">Resultado:</span> ${o(resultado.resultado_general)}</p>
-                <p><span class="text-gray-500">Fecha de muestra:</span> ${fechaLarga(resultado.fecha_toma_muestra)} · <span class="text-gray-500">Fecha del resultado:</span> ${fechaLarga(resultado.fecha_resultado)}</p>
+              <div class="px-4 py-3">
+                <dl class="datos mb-3">
+                  <div><dt>Resultado general</dt><dd>${o(resultado.resultado_general)}</dd></div>
+                  <div><dt>Toma de muestra</dt><dd>${fechaLarga(resultado.fecha_toma_muestra)}</dd></div>
+                </dl>
                 ${(resultado.valores_detallados ?? []).length ? `
-                  <table class="w-full text-sm mt-2 border border-gray-200 rounded">
-                    <thead><tr class="text-left text-xs uppercase text-gray-500 bg-gray-50 border-b">
-                      <th class="px-3 py-1.5">Parámetro</th><th class="px-3 py-1.5">Valor</th>
+                  <table class="border-t border-gray-200">
+                    <thead><tr>
+                      <th class="px-3 py-1.5">Parámetro</th><th class="px-3 py-1.5 text-right">Valor</th>
                       <th class="px-3 py-1.5">Unidad</th><th class="px-3 py-1.5">Rango de referencia</th>
                     </tr></thead>
                     <tbody>
                       ${resultado.valores_detallados.map((v) => `
-                        <tr class="border-b last:border-0">
-                          <td class="px-3 py-1.5 font-medium text-gray-800">${esc(v.parametro)}</td>
-                          <td class="px-3 py-1.5">${esc(v.valor)}</td>
-                          <td class="px-3 py-1.5">${o(v.unidad)}</td>
-                          <td class="px-3 py-1.5">${o(v.rango_referencia)}</td>
+                        <tr>
+                          <td class="px-3 py-2">${esc(v.parametro)}</td>
+                          <td class="px-3 py-2 text-right font-bold">${esc(v.valor)}</td>
+                          <td class="px-3 py-2 text-gray-700">${o(v.unidad)}</td>
+                          <td class="px-3 py-2 text-gray-700">${o(v.rango_referencia)}</td>
                         </tr>`).join('')}
                     </tbody>
                   </table>` : ''}
-                ${resultado.observaciones ? `<p class="mt-2"><span class="text-gray-500">Observaciones:</span> ${esc(resultado.observaciones)}</p>` : ''}
+                ${resultado.observaciones ? `<p class="mt-3 text-gray-700"><span class="font-bold">Observaciones:</span> ${esc(resultado.observaciones)}</p>` : ''}
               </div>` : ''}
           </section>`;
         }).join('')}
@@ -187,7 +195,7 @@ async function vistaLaboratorio(contenedor, params) {
     zona.querySelectorAll('[data-transicion]').forEach((boton) => {
       boton.addEventListener('click', async () => {
         const destino = boton.dataset.transicion;
-        if (!await confirmar(destino === 'Cancelada' ? 'Cancelar esta orden de laboratorio?' : `Cambiar la orden al estado "${destino}"?`, { textoBoton: 'Aplicar' })) return;
+        if (!await confirmar(destino === 'Cancelada' ? 'La orden se cancelará y ya no admitirá resultados.' : `La orden pasará a "${destino}".`, { textoBoton: destino === 'Cancelada' ? 'Cancelar orden' : 'Cambiar estado', titulo: 'Estado de la orden', peligro: destino === 'Cancelada' })) return;
         try {
           await conCarga(boton, async () => {
             const actualizada = await api.actualizar(`/api/laboratorio/ordenes/${encodeURIComponent(orden.id_orden_laboratorio)}/estado`, { estado: destino });
@@ -210,49 +218,51 @@ async function vistaLaboratorio(contenedor, params) {
   }
 
   function modalRegistrarResultado(orden, examen, alPintar) {
-    const capa = abrirModal(`Resultado: ${examen.nombre}`, `
-      <div class="space-y-3">
-        <label class="block">
-          <span class="${ETIQUETA}">Fecha de toma de muestra</span>
-          <input type="date" data-toma class="${CAMPO_TEXTO}">
-        </label>
-        <label class="block">
-          <span class="${ETIQUETA}">Fecha del resultado</span>
-          <input type="date" data-resultado value="${hoy()}" class="${CAMPO_TEXTO}">
-        </label>
+    const capa = abrirModal(`Resultado de ${examen.nombre}`, `
+      <div class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label class="block">
+            <span class="${ETIQUETA}">Fecha de toma de muestra</span>
+            <input type="date" data-toma max="${hoy()}" class="${CAMPO_TEXTO}">
+          </label>
+          <label class="block">
+            <span class="${ETIQUETA}">Fecha del resultado</span>
+            <input type="date" data-resultado value="${hoy()}" max="${hoy()}" class="${CAMPO_TEXTO}">
+          </label>
+        </div>
         <label class="block">
           <span class="${ETIQUETA}">Resultado general</span>
           <textarea data-general rows="2" class="${CAMPO_TEXTO}"></textarea>
         </label>
         <div>
           <p class="${ETIQUETA}">Valores medidos</p>
+          <p class="text-sm text-gray-600 mb-2">Cada examen tiene sus propios parámetros: añade los que correspondan.</p>
           <div data-valores></div>
-          <button type="button" data-agregar-valor class="text-sm text-blue-600 hover:text-blue-800">Agregar parámetro medido</button>
+          <button type="button" data-agregar-valor class="enlace">Añadir parámetro</button>
         </div>
         <label class="block">
           <span class="${ETIQUETA}">Observaciones</span>
           <textarea data-observaciones rows="2" class="${CAMPO_TEXTO}"></textarea>
         </label>
-        <p class="text-xs text-gray-500">El resultado y el estado de la orden se guardan como una unidad.</p>
-        <div class="flex justify-end gap-2">
-          <button type="button" data-cancelar class="px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-          <button type="button" data-guardar class="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">Guardar resultado</button>
-        </div>
+        <p class="text-sm text-gray-600">El resultado y el avance de la orden se guardan juntos.</p>
+        ${pieModalHtml('Guardar resultado')}
       </div>`, { ampliada: true });
 
     const filaValorHtml = () => `
-      <div class="fila-valor grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+      <div class="fila-valor renglon grid grid-cols-2 sm:grid-cols-4 gap-2">
         <input type="text" data-parametro maxlength="100" placeholder="Parámetro *" class="${CAMPO_TEXTO_CORTO}">
         <input type="text" data-valor maxlength="100" placeholder="Valor *" class="${CAMPO_TEXTO_CORTO}">
         <input type="text" data-unidad maxlength="30" placeholder="Unidad" class="${CAMPO_TEXTO_CORTO}">
         <div class="flex gap-1">
           <input type="text" data-rango maxlength="100" placeholder="Rango ref." class="${CAMPO_TEXTO_CORTO} flex-1">
-          <button type="button" data-quitar-valor class="text-red-600 hover:text-red-800 text-sm px-1">Quitar</button>
+          <button type="button" data-quitar-valor class="enlace-quitar px-1">Quitar</button>
         </div>
       </div>`;
 
+    capa.querySelector('[data-valores]').insertAdjacentHTML('beforeend', filaValorHtml());
     capa.querySelector('[data-agregar-valor]').addEventListener('click', () => {
       capa.querySelector('[data-valores]').insertAdjacentHTML('beforeend', filaValorHtml());
+      capa.querySelector('[data-valores]').lastElementChild.querySelector('input').focus();
     });
     capa.querySelector('[data-valores]').addEventListener('click', (evento) => {
       const quitar = evento.target.closest('[data-quitar-valor]');
@@ -305,9 +315,11 @@ async function vistaLaboratorio(contenedor, params) {
     botonNueva.addEventListener('click', async () => {
       const tipos = await api.obtener('/api/laboratorio/tipos-examen');
       const selectorOrden = crearSelectorPaciente({ etiqueta: 'Paciente *', soloActivos: true });
+      // Los marcados sobreviven al filtro: la lista se repinta, la selección no.
+      const marcados = new Set();
 
       const capa = abrirModal('Nueva orden de laboratorio', `
-        <div class="space-y-3" data-form-orden>
+        <div class="space-y-4" data-form-orden>
           <div data-zona-selector></div>
           <label class="block">
             <span class="${ETIQUETA}">Prioridad</span>
@@ -320,27 +332,30 @@ async function vistaLaboratorio(contenedor, params) {
             <textarea data-obs-orden rows="2" class="${CAMPO_TEXTO}"></textarea>
           </label>
           <div>
-            <input type="search" data-filtro-tipo placeholder="Filtrar tipos de examen" class="${CAMPO_TEXTO} mb-2">
-            <div data-lista-tipos class="border border-gray-200 rounded-lg p-3 max-h-56 overflow-y-auto space-y-1 text-sm"></div>
+            <p class="${ETIQUETA}">Exámenes *</p>
+            <input type="search" data-filtro-tipo placeholder="Filtrar por nombre" aria-label="Filtrar tipos de examen" class="${CAMPO_TEXTO} mb-2">
+            <div data-lista-tipos class="border border-gray-300 rounded-md max-h-60 overflow-y-auto divide-y divide-gray-100"></div>
           </div>
-          <div class="flex justify-end gap-2">
-            <button type="button" data-cancelar class="px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-            <button type="button" data-guardar class="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">Crear orden</button>
-          </div>
+          ${pieModalHtml('Crear orden')}
         </div>`, { alMontar: (capaModal) => {
           capaModal.querySelector('[data-zona-selector]').appendChild(selectorOrden.elemento);
           const lista = capaModal.querySelector('[data-lista-tipos]');
           const pintarTipos = (texto = '') => {
             const filtrados = tipos.filter((t) => t.nombre.toLowerCase().includes(texto.toLowerCase()));
             lista.innerHTML = filtrados.length === 0
-              ? '<p class="text-sm text-gray-400">Sin coincidencias.</p>'
+              ? '<p class="text-sm text-gray-600">Sin coincidencias.</p>'
               : filtrados.map((t) => `
-                <label class="flex items-start gap-2">
-                  <input type="checkbox" data-tipo-examen value="${esc(t.id_tipo_examen)}" class="mt-1">
-                  <span class="text-sm text-gray-700">${esc(t.nombre)}<span class="block text-xs text-gray-400">${o(t.tipo_muestra)}</span></span>
+                <label class="flex items-start gap-3 px-3 py-2 hover:bg-blue-50 cursor-pointer">
+                  <input type="checkbox" data-tipo-examen value="${esc(t.id_tipo_examen)}" ${marcados.has(String(t.id_tipo_examen)) ? 'checked' : ''} class="mt-1 accent-blue-600 w-4 h-4">
+                  <span>${esc(t.nombre)}<span class="block text-sm text-gray-600">Muestra: ${o(t.tipo_muestra)}</span></span>
                 </label>`).join('');
           };
           pintarTipos();
+          lista.addEventListener('change', (e) => {
+            const casilla = e.target.closest('[data-tipo-examen]');
+            if (!casilla) return;
+            if (casilla.checked) marcados.add(casilla.value); else marcados.delete(casilla.value);
+          });
           capaModal.querySelector('[data-filtro-tipo]').addEventListener('input', (e) => pintarTipos(e.target.value.trim()));
         }, ampliada: true });
 
@@ -348,8 +363,7 @@ async function vistaLaboratorio(contenedor, params) {
       capa.querySelector('[data-guardar]').addEventListener('click', async (evento) => {
         const idPaciente = selectorOrden.valor();
         if (!idPaciente) { avisar('Elige el paciente de la orden.', 'advertencia'); return; }
-        const examenes = Array.from(capa.querySelectorAll('[data-tipo-examen]:checked'))
-          .map((input) => ({ id_tipo_examen: input.value }));
+        const examenes = [...marcados].map((id) => ({ id_tipo_examen: id }));
         if (!examenes.length) { avisar('Marca al menos un tipo de examen.', 'advertencia'); return; }
 
         const cuerpo = { id_paciente: idPaciente, examenes };

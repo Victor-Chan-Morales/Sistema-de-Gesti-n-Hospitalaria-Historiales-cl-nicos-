@@ -9,9 +9,12 @@ consume es el mismo porque el backend lo normaliza en sus DTOs. Express sirve
 
 ```
 frontend/
-  index.html        login
-  dashboard.html    panel: encabezado con sesión, navegación y contenedor de vistas
+  index.html        login en dos columnas: presentación de la red y formulario
+  dashboard.html    panel: columna lateral (institución, navegación, sesión) y contenedor de vistas
+  css/
+    clinico.css    componentes del sistema visual: marco, ficha, secciones, tablas, botones, modal
   js/
+    tema.js        configuración de Tailwind: tipografía y paletas gray/blue remapeadas al tema
     sesion.js      token y usuario en localStorage; matriz de permisos espejo del backend
     api.js         cliente HTTP: Authorization Bearer, ApiError con estado y código
     utilidades.js  fechas del contrato, insignias, avisos, modales, selector de paciente
@@ -25,6 +28,28 @@ frontend/
       laboratorio.js  órdenes y resultados (solo institución 3)
       pediatria.js    controles y vacunas (solo institución 4)
 ```
+
+## Diseño visual
+
+- **Un solo tema para las cuatro instituciones**, porque el enunciado pide que la
+  interfaz no cambie según el motor. Verde clínico (`#0E6A5A`) como color de
+  acción, grises verdosos para superficies y tipografía Atkinson Hyperlegible,
+  pensada para la legibilidad de cifras y textos clínicos.
+- `js/tema.js` remapea las paletas `gray` y `blue` de Tailwind, de modo que las
+  clases utilitarias heredan el tema sin reescribirse.
+- **La ficha del paciente** es el elemento principal: encabeza historial,
+  consultas, detalle y pediatría con nombre, estado, datos clave y una franja de
+  alergias (visible siempre, para que el profesional no la pase por alto).
+- Sin tarjetas decorativas: el contenido se ordena con secciones regladas,
+  tablas, formularios en bloques (título y explicación a la izquierda, campos a
+  la derecha) y un pie de guardado fijo.
+- La agenda agrupa las citas por día; laboratorio y pediatría muestran cada
+  orden o seguimiento como un informe (datos, tablas de parámetros, último
+  control con su variación respecto al anterior, dosis vencidas resaltadas).
+- Accesibilidad: foco visible, navegación con `aria-current`, pestañas con
+  `role="tab"` y `aria-selected`, modales que se cierran con Escape y devuelven
+  el foco, y avisos en `aria-live`. Respeta `prefers-reduced-motion` y, por
+  debajo de 860 px, la navegación pasa a una barra horizontal.
 
 ## Decisiones
 

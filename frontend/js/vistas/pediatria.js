@@ -14,75 +14,96 @@ async function vistaPediatria(contenedor, params) {
   const estado = { paciente: null, controles: [], vacunas: [], pestana: 'controles', catalogoVacunas: [] };
 
   contenedor.innerHTML = `
-    <h1 class="text-xl font-semibold text-gray-800 mb-4">Seguimiento pediátrico</h1>
-    <div class="bg-white border border-gray-200 rounded-lg p-4 mb-4" data-espacio-selector></div>
+    ${encabezadoHtml('Seguimiento pediátrico', { descripcion: 'Controles de crecimiento y esquema de vacunación de pacientes menores de 18 años.' })}
+    <div class="max-w-2xl mb-6" data-espacio-selector></div>
     <div data-zona-pediatria></div>`;
+
+  // Diferencia con el control anterior, con signo: "+0.40".
+  const variacion = (actual, previo) => {
+    if (actual == null || previo == null) return '';
+    const d = Number(actual) - Number(previo);
+    return ` <span class="text-sm font-normal text-gray-600">(${d >= 0 ? '+' : ''}${d.toFixed(2)})</span>`;
+  };
 
   const pintar = () => {
     const zona = contenedor.querySelector('[data-zona-pediatria]');
     if (!estado.paciente) {
-      zona.innerHTML = '<p class="text-sm text-gray-500 py-6 text-center">Busca y elige un paciente para ver su seguimiento.</p>';
+      zona.innerHTML = vacioHtml('Elige un paciente', ' Búscalo por nombre o documento para ver su seguimiento.');
       return;
     }
 
     const esMenor = esMenorDeEdad(estado.paciente.fecha_nacimiento);
+    const puedeAnotar = puedeRegistrar && esMenor && estado.paciente.estado === 'Activo';
+    const enControles = estado.pestana === 'controles';
+    const ordenados = [...estado.controles].sort((x, y) => String(y.fecha_control).localeCompare(String(x.fecha_control)));
+    const [ultimo, anterior] = ordenados;
+    const diaHoy = hoy();
+
     zona.innerHTML = `
-      <div class="flex items-center justify-between gap-2 flex-wrap mb-4">
-        <div class="flex gap-1 border-b border-gray-200">
-          <button type="button" data-pestana="controles" class="px-4 py-2 text-sm font-medium ${estado.pestana === 'controles' ? 'text-blue-700 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}">Controles de crecimiento</button>
-          <button type="button" data-pestana="vacunas" class="px-4 py-2 text-sm font-medium ${estado.pestana === 'vacunas' ? 'text-blue-700 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}">Registro de vacunación</button>
+      ${fichaPacienteHtml(estado.paciente, { alergias: estado.alergias })}
+      ${esMenor ? '' : `<div class="mb-5">${bannerHtml('El paciente tiene 18 años o más: el seguimiento pediátrico solo aplica a menores.', 'advertencia')}</div>`}
+      <div class="flex items-end justify-between gap-3 flex-wrap border-b border-gray-200 mb-5">
+        <div class="pestanas !border-0 !mb-0" role="tablist">
+          <button type="button" role="tab" data-pestana="controles" aria-selected="${enControles}" class="pestana">Controles de crecimiento <span class="font-normal">(${estado.controles.length})</span></button>
+          <button type="button" role="tab" data-pestana="vacunas" aria-selected="${!enControles}" class="pestana">Vacunación <span class="font-normal">(${estado.vacunas.length})</span></button>
         </div>
-        ${puedeRegistrar && esMenor ? `
-          <button type="button" data-registrar-control class="hidden bg-blue-600 text-white text-sm rounded px-4 py-2 hover:bg-blue-700">Registrar control</button>
-          <button type="button" data-registrar-dosis class="hidden bg-blue-600 text-white text-sm rounded px-4 py-2 hover:bg-blue-700">Registrar dosis</button>` : ''}
+        ${puedeAnotar ? `<div class="pb-2">${enControles
+          ? '<button type="button" data-registrar-control class="btn btn-primario">Registrar control</button>'
+          : '<button type="button" data-registrar-dosis class="btn btn-primario">Registrar dosis</button>'}</div>` : ''}
       </div>
-      ${esMenor ? '' : bannerHtml('El paciente tiene 18 años o más: el seguimiento pediátrico solo aplica a menores.', 'advertencia')}
-      <div data-tabla></div>`;
+      <div data-tabla role="tabpanel"></div>`;
 
     const tabla = zona.querySelector('[data-tabla]');
-    if (estado.pestana === 'controles') {
-      zona.querySelector('[data-registrar-control]')?.classList.remove('hidden');
+    if (enControles) {
       tabla.innerHTML = estado.controles.length === 0
-        ? '<div class="bg-white border border-gray-200 rounded-lg p-6 text-center text-gray-400 text-sm">Sin controles de crecimiento registrados.</div>'
-        : `<div class="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead><tr class="text-left text-xs uppercase text-gray-500 border-b bg-gray-50">
-                <th class="px-3 py-2">Fecha</th><th class="px-3 py-2">Peso (kg)</th><th class="px-3 py-2">Talla (cm)</th>
-                <th class="px-3 py-2">Perímetro cefálico (cm)</th><th class="px-3 py-2">IMC</th><th class="px-3 py-2">Observaciones</th>
+        ? `<div class="tabla-marco">${vacioHtml('Sin controles de crecimiento', puedeAnotar ? ' Registra el primero con "Registrar control".' : '')}</div>`
+        : `<dl class="datos mb-5">
+            <div><dt>Último control</dt><dd>${fechaLarga(ultimo.fecha_control)}</dd></div>
+            <div><dt>Peso (kg)</dt><dd>${o(ultimo.peso)}${variacion(ultimo.peso, anterior?.peso)}</dd></div>
+            <div><dt>Talla (cm)</dt><dd>${o(ultimo.talla)}${variacion(ultimo.talla, anterior?.talla)}</dd></div>
+            <div><dt>IMC</dt><dd>${o(ultimo.indice_masa_corporal)}</dd></div>
+          </dl>
+          <div class="tabla-marco">
+            <table>
+              <thead><tr>
+                <th class="px-4 py-2">Fecha</th><th class="px-3 py-2 text-right">Peso (kg)</th><th class="px-3 py-2 text-right">Talla (cm)</th>
+                <th class="px-3 py-2 text-right">Perímetro cefálico (cm)</th><th class="px-3 py-2 text-right">IMC</th><th class="px-3 py-2">Observaciones</th>
               </tr></thead>
               <tbody>
-                ${estado.controles.map((c) => `
-                  <tr class="border-b last:border-0">
-                    <td class="px-3 py-2 whitespace-nowrap">${fechaLarga(c.fecha_control)}</td>
-                    <td class="px-3 py-2">${o(c.peso)}</td>
-                    <td class="px-3 py-2">${o(c.talla)}</td>
-                    <td class="px-3 py-2">${o(c.perimetro_cefalico)}</td>
-                    <td class="px-3 py-2 font-medium text-gray-800">${o(c.indice_masa_corporal)}</td>
-                    <td class="px-3 py-2">${o(c.observaciones)}</td>
+                ${ordenados.map((c) => `
+                  <tr>
+                    <td class="px-4 py-2.5 whitespace-nowrap">${fechaLarga(c.fecha_control)}</td>
+                    <td class="px-3 py-2.5 text-right">${o(c.peso)}</td>
+                    <td class="px-3 py-2.5 text-right">${o(c.talla)}</td>
+                    <td class="px-3 py-2.5 text-right">${o(c.perimetro_cefalico)}</td>
+                    <td class="px-3 py-2.5 text-right font-bold">${o(c.indice_masa_corporal)}</td>
+                    <td class="px-3 py-2.5 text-gray-700">${o(c.observaciones)}</td>
                   </tr>`).join('')}
               </tbody>
             </table>
           </div>`;
     } else {
-      zona.querySelector('[data-registrar-dosis]')?.classList.remove('hidden');
       tabla.innerHTML = estado.vacunas.length === 0
-        ? '<div class="bg-white border border-gray-200 rounded-lg p-6 text-center text-gray-400 text-sm">Sin dosis registradas.</div>'
-        : `<div class="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead><tr class="text-left text-xs uppercase text-gray-500 border-b bg-gray-50">
-                <th class="px-3 py-2">Vacuna</th><th class="px-3 py-2">Dosis</th><th class="px-3 py-2">Aplicación</th>
+        ? `<div class="tabla-marco">${vacioHtml('Sin dosis registradas', puedeAnotar ? ' Registra la primera con "Registrar dosis".' : '')}</div>`
+        : `<div class="tabla-marco">
+            <table>
+              <thead><tr>
+                <th class="px-4 py-2">Vacuna</th><th class="px-3 py-2">Dosis</th><th class="px-3 py-2">Aplicada</th>
                 <th class="px-3 py-2">Lote</th><th class="px-3 py-2">Centro</th><th class="px-3 py-2">Próxima dosis</th>
               </tr></thead>
               <tbody>
-                ${estado.vacunas.map((v) => `
-                  <tr class="border-b last:border-0">
-                    <td class="px-3 py-2 font-medium text-gray-800">${esc(v.nombre_vacuna)}</td>
-                    <td class="px-3 py-2">${esc(v.numero_dosis)}</td>
-                    <td class="px-3 py-2 whitespace-nowrap">${fechaLarga(v.fecha_aplicacion)}</td>
-                    <td class="px-3 py-2">${o(v.lote)}</td>
-                    <td class="px-3 py-2">${o(v.centro_aplicacion)}</td>
-                    <td class="px-3 py-2 whitespace-nowrap">${v.proxima_dosis ? fechaLarga(v.proxima_dosis) : '—'}</td>
-                  </tr>`).join('')}
+                ${estado.vacunas.map((v) => {
+                  const vencida = v.proxima_dosis && String(v.proxima_dosis) < diaHoy;
+                  return `
+                  <tr>
+                    <td class="px-4 py-2.5 font-bold">${esc(v.nombre_vacuna)}</td>
+                    <td class="px-3 py-2.5">${esc(v.numero_dosis)}</td>
+                    <td class="px-3 py-2.5 whitespace-nowrap">${fechaLarga(v.fecha_aplicacion)}</td>
+                    <td class="px-3 py-2.5 text-gray-700">${o(v.lote)}</td>
+                    <td class="px-3 py-2.5 text-gray-700">${o(v.centro_aplicacion)}</td>
+                    <td class="px-3 py-2.5 whitespace-nowrap ${vencida ? 'text-red-700 font-bold' : ''}">${v.proxima_dosis ? `${fechaLarga(v.proxima_dosis)}${vencida ? ' (vencida)' : ''}` : '—'}</td>
+                  </tr>`;
+                }).join('')}
               </tbody>
             </table>
           </div>`;
@@ -103,18 +124,21 @@ async function vistaPediatria(contenedor, params) {
     if (!paciente) {
       estado.controles = [];
       estado.vacunas = [];
+      estado.alergias = undefined;
       pintar();
       return;
     }
     const zona = contenedor.querySelector('[data-zona-pediatria]');
-    zona.innerHTML = '<p class="text-sm text-gray-500 py-6 text-center">Cargando seguimiento...</p>';
+    zona.innerHTML = cargandoHtml('Cargando seguimiento...');
     try {
-      const [controles, vacunas] = await Promise.all([
+      const [controles, vacunas, alergias] = await Promise.all([
         api.obtener(`/api/pediatria/pacientes/${encodeURIComponent(paciente.id_paciente)}/controles`),
         api.obtener(`/api/pediatria/pacientes/${encodeURIComponent(paciente.id_paciente)}/vacunas`),
+        api.obtener(`/api/pacientes/${encodeURIComponent(paciente.id_paciente)}/historial`).then((h) => h.alergias ?? []).catch(() => undefined),
       ]);
       estado.controles = controles;
       estado.vacunas = vacunas;
+      estado.alergias = alergias;
       pintar();
     } catch (error) {
       zona.innerHTML = bannerErrorHtml(error);
@@ -134,10 +158,10 @@ async function vistaPediatria(contenedor, params) {
 
 function modalRegistrarControl(estado, alRecargar) {
   const capa = abrirModal('Registrar control de crecimiento', `
-    <div class="space-y-3">
+    <div class="space-y-4">
       <label class="block">
         <span class="${ETIQUETA}">Fecha del control</span>
-        <input type="date" data-fecha value="${hoy()}" class="${CAMPO_TEXTO}">
+        <input type="date" data-fecha value="${hoy()}" max="${hoy()}" class="${CAMPO_TEXTO}">
       </label>
       <div class="grid grid-cols-2 gap-3">
         <label class="block">
@@ -157,15 +181,12 @@ function modalRegistrarControl(estado, alRecargar) {
           <input type="number" step="0.01" min="0" data-imc class="${CAMPO_TEXTO}">
         </label>
       </div>
-      <p class="text-xs text-gray-500">Si dejas el IMC vacío, se calcula con el peso y la talla.</p>
+      <p class="text-sm text-gray-600">Si dejas el IMC vacío, se calcula con el peso y la talla.</p>
       <label class="block">
         <span class="${ETIQUETA}">Observaciones</span>
         <textarea data-observaciones rows="2" class="${CAMPO_TEXTO}"></textarea>
       </label>
-      <div class="flex justify-end gap-2">
-        <button type="button" data-cancelar class="px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-        <button type="button" data-guardar class="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">Guardar control</button>
-      </div>
+      ${pieModalHtml('Guardar control')}
     </div>`);
 
   capa.querySelector('[data-cancelar]').addEventListener('click', cerrarModal);
@@ -200,7 +221,7 @@ function modalRegistrarControl(estado, alRecargar) {
 async function modalRegistrarDosis(estado, alRecargar) {
   const vacunas = await api.obtener('/api/pediatria/vacunas');
   const capa = abrirModal('Registrar dosis de vacuna', `
-    <div class="space-y-3">
+    <div class="space-y-4">
       <label class="block">
         <span class="${ETIQUETA}">Vacuna *</span>
         <select data-vacuna required class="${CAMPO_TEXTO}">
@@ -214,7 +235,7 @@ async function modalRegistrarDosis(estado, alRecargar) {
         </label>
         <label class="block">
           <span class="${ETIQUETA}">Fecha de aplicación</span>
-          <input type="date" data-aplicacion value="${hoy()}" class="${CAMPO_TEXTO}">
+          <input type="date" data-aplicacion value="${hoy()}" max="${hoy()}" class="${CAMPO_TEXTO}">
         </label>
         <label class="block">
           <span class="${ETIQUETA}">Lote</span>
@@ -227,16 +248,13 @@ async function modalRegistrarDosis(estado, alRecargar) {
       </div>
       <label class="block">
         <span class="${ETIQUETA}">Próxima dosis</span>
-        <input type="date" data-proxima class="${CAMPO_TEXTO}">
+        <input type="date" data-proxima min="${hoy()}" class="${CAMPO_TEXTO}">
       </label>
       <label class="block">
         <span class="${ETIQUETA}">Observaciones</span>
         <textarea data-observaciones rows="2" class="${CAMPO_TEXTO}"></textarea>
       </label>
-      <div class="flex justify-end gap-2">
-        <button type="button" data-cancelar class="px-4 py-2 rounded border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-        <button type="button" data-guardar class="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">Guardar dosis</button>
-      </div>
+      ${pieModalHtml('Guardar dosis')}
     </div>`);
 
   capa.querySelector('[data-cancelar]').addEventListener('click', cerrarModal);
