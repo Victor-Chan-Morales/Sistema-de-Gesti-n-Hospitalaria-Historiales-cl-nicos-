@@ -45,7 +45,7 @@ Proyecto final de Bases de Datos II (Universidad Rafael Landívar). Plataforma c
 
 **Herramientas**
 - Docker Compose, datos de prueba repetibles y documentación interactiva de la API.
-- 122 pruebas unitarias y de arquitectura, y la suite de contrato de integración para los cuatro motores.
+- 124 pruebas unitarias y de arquitectura, y la suite de contrato de integración para los cuatro motores.
 
 ### Lo que aún no está
 

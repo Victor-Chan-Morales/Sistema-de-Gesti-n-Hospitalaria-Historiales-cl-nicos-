@@ -40,7 +40,7 @@ de `docs/` (ADR-001, ADR-002, contratos de API, seguridad).
 
 | Requisito | Estado |
 |---|---|
-| Consultas equivalentes en los cuatro motores, misma estructura JSON | La misma suite de contrato valida los cuatro adaptadores. La comparación directa de JSON ya coincide entre MongoDB y Firebase; faltan PostgreSQL y MySQL (P2) |
+| Consultas equivalentes en los cuatro motores, misma estructura JSON | La misma suite de contrato valida los cuatro adaptadores. La comparación directa de JSON coincide entre los cuatro motores (P2) |
 | Modelo documental justificado (embeber o referenciar) | Cumplido: `04-modelo-documental.md` |
 | Documento comparativo por motor | Cumplido: `08-comparativo.md` |
 | Enrutamiento por usuario según su institución | Cumplido: la fábrica del Integrante A ya registra los cuatro motores |
@@ -74,10 +74,10 @@ de forma coherente.
 
 - **P1. Resuelto.** Las pruebas de integración pasan contra servicios reales: 26 contra MongoDB Atlas y
   27 contra un proyecto de Firestore, incluidas las de envíos simultáneos y atomicidad.
-- **P2. Equivalencia entre los cuatro motores, parcial.** `equivalencia-motores.test.js` corre el mismo flujo
-  en cada motor (usando la fábrica, como la aplicación) y compara el JSON. Ya se ejecutó con MongoDB y
-  Firebase y devuelven lo mismo. Falta incluir PostgreSQL y MySQL, que dependen de la Parte A (levantar sus
-  bases). Con `EQUIVALENCIA_EXIGIR_TODOS=1` la prueba falla si falta alguno de los cuatro.
+- **P2. Resuelto.** `equivalencia-motores.test.js` corre el mismo flujo en cada motor (usando la fábrica,
+  como la aplicación) y compara el JSON. Se ejecutó con `EQUIVALENCIA_EXIGIR_TODOS=1` sobre PostgreSQL, MySQL,
+  MongoDB y Firebase (emulador de Firestore) levantados con Docker, y los cuatro devuelven lo mismo. Las
+  pruebas de contrato de PostgreSQL y MySQL también pasan (40 de 40).
 - **P3. Parámetros de examen.** La clasificación de la información menciona "Parámetro de examen"
   (parámetros y rangos de referencia por tipo de examen), pero no tiene atributos definidos en las entidades.
   Hoy el rango de referencia viaja dentro de cada valor del resultado. Si el equipo quiere un catálogo de
