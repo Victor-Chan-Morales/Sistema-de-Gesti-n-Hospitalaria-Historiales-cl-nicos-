@@ -110,7 +110,52 @@ const catalogoDiagnosticoDto = (d) => elegir(d, ['id_catalogo_diag', 'codigo_cli
 const medicamentoDto = (m) => elegir(m, ['id_medicamento', 'nombre', 'principio_activo', 'presentacion', 'concentracion']);
 const catalogoAlergiaDto = (a) => elegir(a, ['id_catalogo_alergia', 'sustancia', 'tipo_alergia']);
 
+// --- Laboratorio Clínico ---
+
+const tipoExamenDto = (t) => elegir(t, ['id_tipo_examen', 'nombre', 'descripcion', 'tipo_muestra', 'estado']);
+
+const valorDetalladoDto = (v) => elegir(v, ['parametro', 'valor', 'unidad', 'rango_referencia']);
+
+const resultadoLaboratorioDto = (r) => ({
+  ...elegir(r, [
+    'id_resultado', 'id_orden_laboratorio', 'id_tipo_examen', 'fecha_toma_muestra', 'fecha_resultado',
+    'resultado_general', 'observaciones', 'id_usuario_laboratorista',
+  ]),
+  valores_detallados: lista(r.valores_detallados, valorDetalladoDto),
+});
+
+const ordenLaboratorioDto = (o) => ({
+  ...elegir(o, [
+    'id_orden_laboratorio', 'id_historial', 'id_paciente', 'id_usuario_solicitante', 'fecha_orden',
+    'prioridad', 'estado', 'observaciones',
+  ]),
+  examenes: lista(o.examenes, (e) => elegir(e, ['id_tipo_examen', 'nombre', 'tipo_muestra'])),
+  resultados: lista(o.resultados, resultadoLaboratorioDto),
+});
+
+// --- Centro Médico Pediátrico ---
+
+const vacunaDto = (v) => elegir(v, [
+  'id_vacuna', 'nombre', 'enfermedad_prevenida', 'numero_dosis_requeridas', 'descripcion', 'estado',
+]);
+
+const controlCrecimientoDto = (c) => elegir(c, [
+  'id_control_crecimiento', 'id_historial', 'id_consulta', 'fecha_control', 'peso', 'talla',
+  'perimetro_cefalico', 'indice_masa_corporal', 'observaciones',
+]);
+
+const registroVacunaDto = (r) => elegir(r, [
+  'id_registro_vacuna', 'id_historial', 'id_vacuna', 'nombre_vacuna', 'numero_dosis', 'fecha_aplicacion',
+  'lote', 'centro_aplicacion', 'proxima_dosis', 'observaciones',
+]);
+
 module.exports = {
+  tipoExamenDto,
+  ordenLaboratorioDto,
+  resultadoLaboratorioDto,
+  vacunaDto,
+  controlCrecimientoDto,
+  registroVacunaDto,
   usuarioDto,
   profesionalDto,
   pacienteDto,

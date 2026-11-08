@@ -6,15 +6,15 @@ Proyecto final de Bases de Datos II (Universidad Rafael Landívar). Plataforma c
 |---|---|---|---|
 | Hospital General | 1 | PostgreSQL | Implementado |
 | Clínica Odontológica | 2 | MySQL | Implementado |
-| Laboratorio Clínico | 3 | MongoDB | Pendiente (B); responde 503 |
-| Centro Médico Pediátrico | 4 | Firebase (Firestore) | Pendiente (B); responde 503 |
+| Laboratorio Clínico | 3 | MongoDB | Implementado |
+| Centro Médico Pediátrico | 4 | Firebase (Firestore) | Implementado |
 
 ## Estado del proyecto
 
 | Parte | Responsable | Estado |
 |---|---|---|
 | A: núcleo del backend, autenticación, PostgreSQL y MySQL | Victor | Implementada |
-| B: MongoDB, Firebase, modelo documental y comparativo | Integrante B | Por empezar: [instrucciones](#integrante-b-mongodb-y-firebase) |
+| B: MongoDB, Firebase, modelo documental y comparativo | Integrante B | Implementada: [detalles](#integrante-b-mongodb-y-firebase) |
 | C: pantallas, integración y pruebas | Integrante C | Por empezar: [instrucciones](#integrante-c-frontend-y-qa) |
 
 ### Lo implementado hasta el momento
@@ -27,12 +27,16 @@ Proyecto final de Bases de Datos II (Universidad Rafael Landívar). Plataforma c
 - Login con JWT y bcrypt. Busca al usuario en los motores implementados, en paralelo, y responde con la primera coincidencia ([ADR-002](docs/decisiones/ADR-002-login-entre-motores.md)).
 - Permisos por rol. La institución sale siempre del token, así que un usuario no puede operar sobre otra institución.
 
-**Funcionalidad, en PostgreSQL y MySQL**
+**Funcionalidad, en los cuatro motores**
 - Pacientes: registro con historial clínico, búsqueda, edición y archivo por baja.
 - Historial: consulta completa, alergias y antecedentes.
 - Citas: programar, reprogramar y cancelar. Un paciente archivado o inactivo no recibe citas nuevas.
 - Consultas: consulta, signos vitales, diagnósticos, tratamientos y receta se guardan como una unidad. También se pueden agregar datos a una consulta existente, finalizarla o anularla.
 - Catálogos de diagnósticos, medicamentos, alergias y profesionales.
+
+**Funciones propias de cada institución**
+- Laboratorio (MongoDB): órdenes de examen y resultados de estructura variable. El resultado y el estado de su orden se guardan como una unidad.
+- Centro Pediátrico (Firebase): controles de crecimiento y registro de vacunación.
 
 **Consistencia**
 - Transacciones con `BEGIN/COMMIT/ROLLBACK` y auditoría de quién y cuándo hizo cada escritura.
@@ -41,13 +45,12 @@ Proyecto final de Bases de Datos II (Universidad Rafael Landívar). Plataforma c
 
 **Herramientas**
 - Docker Compose, datos de prueba repetibles y documentación interactiva de la API.
-- 102 pruebas unitarias y de arquitectura, y 45 de integración contra PostgreSQL y MySQL.
+- 122 pruebas unitarias y de arquitectura, y la suite de contrato de integración para los cuatro motores.
 
 ### Lo que aún no está
 
-- Adaptadores de MongoDB y Firebase (B).
 - Pantallas: `frontend/` solo tiene el formulario de login sin conectar y un panel vacío (C).
-- Hospitalización, odontograma y las demás funciones propias de cada institución: las tablas de hospital y clínica existen, pero aún no tienen endpoints.
+- Hospitalización y odontograma: las tablas de hospital y clínica existen, pero aún no tienen endpoints.
 - Límite de intentos fallidos en el login. Además, un token sigue siendo válido hasta expirar, aunque se desactive al usuario.
 
 ## Cómo levantarlo
@@ -56,9 +59,10 @@ Requisitos: Node.js 22 o superior, y Docker con Docker Compose.
 
 ```bash
 cp .env.example .env              # completar las variables (ver abajo)
-docker compose up -d postgres mysql
+docker compose up -d postgres mysql mongo firestore
 cd backend && npm install
-npm run seed                      # datos de prueba; se puede repetir
+npm run seed                      # PostgreSQL y MySQL; se puede repetir
+npm run seed:nosql                # MongoDB y Firebase; se puede repetir
 npm start
 ```
 
@@ -66,6 +70,7 @@ En `.env` hay que definir:
 - `JWT_SECRET`, con al menos 32 caracteres: `openssl rand -hex 32`.
 - `SEED_CONTRASENA`: la contraseña de los usuarios de prueba.
 - Usuario y contraseña de PostgreSQL y MySQL, y `MYSQL_ROOT_PASSWORD`. Cualquier valor sirve en local, porque Docker crea las bases con ellos.
+- `FIREBASE_PROJECT_ID`, que para el emulador puede ser cualquiera, como `demo-red-hospitales`.
 
 Con el servidor en marcha:
 - Aplicación: <http://localhost:3000>
@@ -82,13 +87,15 @@ La contraseña es el valor de `SEED_CONTRASENA`.
 |---|---|---|---|
 | Hospital General | `admin.hospital` | `secretaria.hospital` | `medico.hospital` |
 | Clínica Odontológica | `admin.clinica` | `secretaria.clinica` | `odontologo.clinica` |
+| Laboratorio Clínico | `admin.laboratorio` | `secretaria.laboratorio` | `laboratorista.laboratorio` |
+| Centro Médico Pediátrico | `admin.pediatrico` | `secretaria.pediatrico` | `pediatra.pediatrico` |
 
 ### Pruebas
 
 ```bash
 cd backend
 npm test                    # unitarias y de arquitectura; sin Docker
-npm run test:integracion    # requiere las bases levantadas y npm run seed
+npm run test:integracion    # requiere las bases levantadas, npm run seed y npm run seed:nosql
 ```
 
 ## Arquitectura
@@ -121,24 +128,37 @@ Una petición entra por `adapters/http`, donde el JWT indica la institución. El
 
 ## Integrante B: MongoDB y Firebase
 
-Tu adaptador es correcto si pasa la misma suite de contrato que PostgreSQL y MySQL. No necesitas tocar el dominio, los casos de uso ni las rutas. La guía completa, con ejemplos, está en [`docs/guia-integrante-b.md`](docs/guia-integrante-b.md).
+Implementado. Ambos adaptadores cumplen el mismo contrato que PostgreSQL y MySQL y pasan la misma suite (`backend/tests/contrato/suiteRepositorio.js`). Qué se embebe y qué se referencia está en [`docs/04-modelo-documental.md`](docs/04-modelo-documental.md); la comparación entre motores, en [`docs/08-comparativo.md`](docs/08-comparativo.md).
 
-1. Levanta los motores: `docker compose up -d mongo firestore`. Define `FIREBASE_PROJECT_ID` en `.env`; para el emulador sirve cualquier ID, como `demo-red-hospitales`.
-2. Lee el contrato en `backend/src/ports/repositorioClinico.js`. `backend/tests/unit/apoyo/repoMemoria.js` es un ejemplo completo sin dependencias.
-3. Crea `backend/src/adapters/persistence/mongo/index.js` y `firebase/index.js`, y regístralos en `backend/src/factory/repositoryFactory.js`.
-4. Crea los seeders, con `id_institucion` 3 y 4 y nombres como `laboratorista.laboratorio`. Los nombres de usuario deben ser únicos entre todas las instituciones.
-5. Agrega las pruebas de integración, copiando `backend/tests/integracion/postgres.test.js`.
-6. Redacta `docs/04-modelo-documental.md` y `docs/08-comparativo.md`. La parte relacional del comparativo puede salir de `docs/03-modelo-relacional.md` y `docs/07-seguridad.md`.
+- **MongoDB (Laboratorio):** `backend/src/adapters/persistence/mongo/`. Referenciación: pacientes, historiales, consultas, órdenes y resultados en colecciones separadas. Índices únicos y transacciones multi-documento.
+- **Firebase (Pediátrico):** `backend/src/adapters/persistence/firebase/`. Subcolecciones del paciente para controles de crecimiento y vacunas. Unicidad y doble envío con `runTransaction`.
+- **Funciones propias**, fuera del contrato común (`backend/src/ports/repositoriosEspecializados.js`) y solo en el motor de su institución:
+  - Laboratorio: `/api/laboratorio/*`, con órdenes de uno o varios exámenes y resultados de estructura variable.
+  - Pediátrico: `/api/pediatria/*`, con controles de crecimiento (IMC calculado si no se envía) y registro de vacunación.
+  - En otra institución responden 422.
+- **Laboratorista:** registra órdenes y resultados. Conserva los permisos clínicos comunes de `roles.js`, que son los que usa el contrato compartido de consultas.
+- **Pediatra:** es un usuario con rol `Médico` en el Centro Pediátrico. El seguimiento pediátrico exige un paciente activo y menor de 18 años.
+- **Firestore:** `backend/db/firebase/firestore.rules` deniega todo acceso directo; solo el backend, con el SDK de administración, accede.
+
+Para probarlos:
+
+```bash
+docker compose up -d mongo firestore
+cd backend
+npm run seed:nosql                       # o: npm run seed:nosql -- mongo | firebase
+node --test tests/integracion/mongo.test.js
+node --test tests/integracion/firebase.test.js
+```
+
+Define `FIREBASE_PROJECT_ID` en `.env`; para el emulador sirve cualquier ID, como `demo-red-hospitales`.
 
 Puntos importantes:
-- **Firebase:** la propuesta menciona batched writes, pero no sirven para detectar duplicados porque no pueden leer. La suite exige esa verificación, así que usa `runTransaction`.
-- **Tablas nuevas:** también debes reflejar `Auditoria`, agregada después de la Entrega I.
-- **Por definir con Victor:** qué hace `Laboratorista` en el flujo de consultas, y cómo se exponen órdenes, resultados, controles de crecimiento y vacunas. No forman parte del contrato común y hoy no tienen endpoints.
 - **MongoDB sin autenticación:** el replica set de desarrollo corre sin usuario ni contraseña; activarla requiere un keyfile.
+- **Firestore:** la búsqueda por texto y los filtros combinados se completan en memoria; ver los límites en [`docs/08-comparativo.md`](docs/08-comparativo.md#7-límites-de-la-implementación).
 
 ## Integrante C: frontend y QA
 
-Puedes empezar ya con el hospital y la clínica, sin esperar a B: la interfaz no debe cambiar según el motor. Express sirve `frontend/` en <http://localhost:3000>, así que no hay que configurar CORS. Prueba siempre desde esa dirección.
+La interfaz no debe cambiar según el motor. Express sirve `frontend/` en <http://localhost:3000>, así que no hay que configurar CORS. Prueba siempre desde esa dirección.
 
 1. Levanta el backend con las instrucciones de [Cómo levantarlo](#cómo-levantarlo).
 2. Revisa los contratos en [`docs/06-api-contratos.md`](docs/06-api-contratos.md) y prueba los endpoints en `/api/docs`.
@@ -155,15 +175,17 @@ Puntos importantes:
 Para QA:
 - Prueba los flujos completos con cada institución y rol, y confirma que la interfaz sea idéntica.
 - Simula una caída con `docker compose stop mysql`: la clínica debe mostrar el aviso y el hospital debe seguir funcionando.
-- Cuando B termine, repite todo con el laboratorio y el centro pediátrico.
+- Repite todo con el laboratorio y el centro pediátrico. Sus pantallas propias (órdenes y resultados, controles y vacunas) usan `/api/laboratorio` y `/api/pediatria`, documentados en `/api/docs`.
 
 ## Documentación
 
 - [Reglas de negocio](docs/02-reglas-negocio.md)
 - [Modelo relacional](docs/03-modelo-relacional.md)
+- [Modelo documental](docs/04-modelo-documental.md)
 - [Contratos de la API](docs/06-api-contratos.md) y [OpenAPI](docs/openapi.yaml)
 - [Seguridad](docs/07-seguridad.md)
+- [Comparativo de motores](docs/08-comparativo.md)
 - [Decisiones de arquitectura](docs/decisiones/)
-- [Guía para implementar los motores NoSQL](docs/guia-integrante-b.md)
+- [Guía de los motores NoSQL](docs/guia-integrante-b.md)
 
-Aún sin redactar: `docs/01-requisitos.md`, `docs/05-operaciones.md` (todos), `docs/04-modelo-documental.md` y `docs/08-comparativo.md` (B).
+Aún sin redactar: `docs/01-requisitos.md` y `docs/05-operaciones.md`.
