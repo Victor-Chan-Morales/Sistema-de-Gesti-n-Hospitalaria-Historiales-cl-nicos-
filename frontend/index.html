@@ -7,20 +7,28 @@
   <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 </head>
 <body class="min-h-screen bg-gray-100 flex items-center justify-center">
+  <div id="avisos" class="fixed top-4 right-4 z-50 flex flex-col gap-2 items-end"></div>
   <main class="w-full max-w-sm bg-white rounded-lg shadow p-6">
-    <h1 class="text-xl font-semibold mb-6">Iniciar sesión</h1>
+    <h1 class="text-xl font-semibold mb-1">Red de hospitales</h1>
+    <p class="text-sm text-gray-500 mb-6">Plataforma compartida de historiales clínicos</p>
+    <div id="mensaje" class="hidden mb-4"></div>
     <form id="form-login" class="space-y-4">
       <div>
         <label for="usuario" class="block text-sm mb-1">Usuario</label>
-        <input id="usuario" name="usuario" type="text" class="w-full border rounded px-3 py-2">
+        <input id="usuario" name="usuario" type="text" required maxlength="50" autocomplete="username"
+               class="w-full border rounded px-3 py-2">
       </div>
       <div>
         <label for="contrasena" class="block text-sm mb-1">Contraseña</label>
-        <input id="contrasena" name="contrasena" type="password" class="w-full border rounded px-3 py-2">
+        <input id="contrasena" name="contrasena" type="password" required autocomplete="current-password"
+               class="w-full border rounded px-3 py-2">
       </div>
-      <button type="submit" class="w-full bg-blue-600 text-white rounded py-2">Entrar</button>
+      <button type="submit" class="w-full bg-blue-600 text-white rounded py-2 hover:bg-blue-700">Entrar</button>
     </form>
   </main>
+  <script src="js/sesion.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/utilidades.js"></script>
+  <script src="js/login.js"></script>
 </body>
 </html>
