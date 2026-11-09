@@ -45,9 +45,17 @@ async function revisarAlergias(repos, idPaciente, receta) {
 // Registra consulta, signos, diagnósticos, tratamientos y receta como una unidad.
 async function registrarAtencion(repos, actor, datos) {
   const limpio = validar(datos, esquemas.nuevaConsulta);
-  reglas.exigirPacienteActivoParaAtencion(await exigirPaciente(repos, limpio.id_paciente));
+  const paciente = await exigirPaciente(repos, limpio.id_paciente);
+  reglas.exigirPacienteActivoParaAtencion(paciente);
 
-  const fechaHora = limpio.fecha_hora ?? ahora();
+  const referencia = ahora();
+  const fechaHora = limpio.fecha_hora ?? referencia;
+  reglas.exigirFechaAtencionValida(fechaHora, paciente.fecha_nacimiento, referencia);
+  if (limpio.id_cita) {
+    const cita = await repos.citas.obtener(limpio.id_cita);
+    if (cita) reglas.exigirCitaDelProfesional(cita, actor.id_usuario);
+  }
+
   const atencion = {
     ...limpio,
     fecha_hora: fechaHora,

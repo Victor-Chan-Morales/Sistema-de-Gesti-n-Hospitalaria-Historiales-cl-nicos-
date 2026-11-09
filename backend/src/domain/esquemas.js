@@ -112,7 +112,8 @@ const signosVitales = {
   frecuencia_cardiaca: { tipo: 'entero', min: 0 },
   frecuencia_respiratoria: { tipo: 'entero', min: 0 },
   peso: { tipo: 'decimal', min: 0, max: 999.99 },
-  talla: { tipo: 'decimal', min: 0, max: 99.99 },
+  // En centímetros, igual que el control pediátrico y el cálculo del IMC.
+  talla: { tipo: 'decimal', min: 0, max: 250 },
   saturacion_oxigeno: { tipo: 'entero', min: 0, max: 100 },
 };
 

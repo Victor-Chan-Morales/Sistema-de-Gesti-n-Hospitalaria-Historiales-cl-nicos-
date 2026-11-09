@@ -117,7 +117,7 @@ CREATE TABLE Correo_Representante (
 
 CREATE TABLE Historial_Clinico (
     id_historial SERIAL PRIMARY KEY,
-    id_paciente INTEGER REFERENCES Paciente(id_paciente),
+    id_paciente INTEGER UNIQUE REFERENCES Paciente(id_paciente),
     id_institucion INTEGER REFERENCES Institucion(id_institucion),
     codigo_historial VARCHAR(50) UNIQUE,
     fecha_apertura DATE NOT NULL,
@@ -186,7 +186,7 @@ CREATE TABLE Signos_Vitales (
     frecuencia_cardiaca INTEGER,
     frecuencia_respiratoria INTEGER,
     peso DECIMAL(5,2),
-    talla DECIMAL(4,2),
+    talla DECIMAL(5,2),
     saturacion_oxigeno INTEGER,
     fecha_registro TIMESTAMP NOT NULL
 );

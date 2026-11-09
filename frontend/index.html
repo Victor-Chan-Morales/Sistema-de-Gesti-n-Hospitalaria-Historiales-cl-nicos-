@@ -4,23 +4,54 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Iniciar sesión - Red de hospitales</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script src="js/tema.js"></script>
+  <link rel="stylesheet" href="css/clinico.css">
 </head>
-<body class="min-h-screen bg-gray-100 flex items-center justify-center">
-  <main class="w-full max-w-sm bg-white rounded-lg shadow p-6">
-    <h1 class="text-xl font-semibold mb-6">Iniciar sesión</h1>
-    <form id="form-login" class="space-y-4">
+<body>
+  <div id="avisos" class="fixed top-4 right-4 z-50 flex flex-col gap-2 items-end"></div>
+  <div class="login">
+    <section class="login-portada">
       <div>
-        <label for="usuario" class="block text-sm mb-1">Usuario</label>
-        <input id="usuario" name="usuario" type="text" class="w-full border rounded px-3 py-2">
+        <p class="!mt-0 text-sm">Red de hospitales</p>
+        <h1 class="mt-3">Un expediente por paciente, en cuatro instituciones</h1>
+        <p>Cada institución guarda sus historiales en su propia base de datos. Al entrar, trabajas solo con los de la tuya.</p>
       </div>
-      <div>
-        <label for="contrasena" class="block text-sm mb-1">Contraseña</label>
-        <input id="contrasena" name="contrasena" type="password" class="w-full border rounded px-3 py-2">
-      </div>
-      <button type="submit" class="w-full bg-blue-600 text-white rounded py-2">Entrar</button>
-    </form>
-  </main>
+      <ul class="red" aria-label="Instituciones de la red">
+        <li><span>Hospital General</span><span>Consultas y tratamientos</span></li>
+        <li><span>Clínica Odontológica</span><span>Atención dental</span></li>
+        <li><span>Laboratorio Clínico</span><span>Exámenes y resultados</span></li>
+        <li><span>Centro Médico Pediátrico</span><span>Crecimiento y vacunas</span></li>
+      </ul>
+    </section>
+
+    <main class="login-formulario">
+      <form id="form-login" class="space-y-5" novalidate>
+        <div>
+          <h2 class="text-2xl font-bold">Iniciar sesión</h2>
+          <p class="text-sm text-gray-600 mt-1">Usa el usuario que te asignó tu institución.</p>
+        </div>
+        <div id="mensaje" class="hidden"></div>
+        <label class="block">
+          <span class="block text-sm font-bold mb-1">Usuario</span>
+          <input id="usuario" name="usuario" type="text" required maxlength="50" autocomplete="username" autofocus
+                 class="w-full border border-gray-300 rounded-md px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600">
+        </label>
+        <label class="block">
+          <span class="block text-sm font-bold mb-1">Contraseña</span>
+          <input id="contrasena" name="contrasena" type="password" required autocomplete="current-password"
+                 class="w-full border border-gray-300 rounded-md px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600">
+        </label>
+        <button type="submit" class="btn btn-primario w-full !min-h-[2.75rem]">Entrar</button>
+      </form>
+    </main>
+  </div>
+  <script src="js/sesion.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/utilidades.js"></script>
+  <script src="js/login.js"></script>
 </body>
 </html>

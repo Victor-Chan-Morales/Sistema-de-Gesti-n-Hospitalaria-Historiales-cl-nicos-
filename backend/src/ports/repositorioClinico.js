@@ -43,7 +43,7 @@ const CONTRATO = Object.freeze({
     // (idPaciente, cambios, actor) => Paciente. Las colecciones presentes se reemplazan.
     actualizar: 1,
     // (idPaciente, { estado, motivo, fecha }, actor) => Paciente.
-    // Actualiza paciente e historial como una unidad.
+    // Actualiza paciente e historial como una unidad, y cancela sus citas programadas.
     archivar: 1,
   },
   historiales: {
@@ -58,13 +58,15 @@ const CONTRATO = Object.freeze({
   },
   citas: {
     // (datos, actor) => Cita. Estado inicial 'Programada'. Lanza RegistroDuplicado si ya hay
-    // una cita programada idéntica; la comprobación debe ser segura ante concurrencia.
+    // una cita programada idéntica, y ConflictoHorario si el profesional o el paciente ya tienen
+    // otra cita programada a esa misma hora. Ambas comprobaciones deben ser seguras ante concurrencia.
     crear: 1,
     // (idCita) => Cita | null
     obtener: 1,
     // ({ id_paciente?, id_usuario_profesional?, estado?, desde?, hasta? }) => Cita[]
     listar: 1,
-    // (idCita, cambios, actor) => Cita
+    // (idCita, cambios, actor) => Cita. Si cambian la fecha o el profesional de una cita
+    // programada, lanza ConflictoHorario en los mismos casos que crear (sin contarse a sí misma).
     actualizar: 1,
   },
   consultas: {
@@ -72,10 +74,13 @@ const CONTRATO = Object.freeze({
     // signos, diagnósticos, tratamientos y receta. Si trae id_cita, marca la cita como
     // 'Atendida'. Lanza ConsultaDuplicada si dentro de la transacción encuentra una consulta
     // idéntica (historial, profesional, motivo, síntomas y notas) en el rango [desde, hasta].
+    // Lanza ConflictoHorario si el profesional o el paciente ya tienen otra consulta no anulada
+    // a esa misma hora.
     registrarAtencion: 1,
     // (idConsulta) => Consulta con id_paciente y detalle anidado | null
     obtener: 1,
-    // (idConsulta, estado, actor) => Consulta
+    // (idConsulta, estado, actor) => Consulta. Si pasa a 'Anulada', cancela la cita que la originó
+    // cuando figuraba como 'Atendida'.
     cambiarEstado: 1,
     // (idConsulta, datos, actor) => Consulta
     agregarDiagnostico: 1,

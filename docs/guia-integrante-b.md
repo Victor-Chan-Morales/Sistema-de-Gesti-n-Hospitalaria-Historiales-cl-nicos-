@@ -1,4 +1,6 @@
-# Guía para implementar los adaptadores de MongoDB y Firebase
+# Guía de los adaptadores de MongoDB y Firebase
+
+**Estado:** ambos adaptadores están implementados en `backend/src/adapters/persistence/mongo/` y `firebase/`. Esta guía explica el contrato que cumplen y es el punto de partida para un motor nuevo. Las decisiones de modelado están en [04-modelo-documental.md](04-modelo-documental.md).
 
 Un adaptador es correcto si pasa la misma suite de contrato que PostgreSQL y MySQL. No hay que tocar el dominio, los casos de uso ni las rutas.
 
@@ -59,11 +61,13 @@ Un adaptador es correcto si pasa la misma suite de contrato que PostgreSQL y MyS
 ```bash
 cd backend
 npm test                                                   # sin Docker
-node --test tests/integracion/mongo.test.js                # tu motor
+npm run seed:nosql                                         # datos de prueba de MongoDB y Firebase
+node --test tests/integracion/mongo.test.js                # MongoDB
+node --test tests/integracion/firebase.test.js             # Firebase (emulador de Firestore)
 npm run test:integracion                                   # todos los motores
 ```
 
-## Por acordar
+## Decisiones tomadas
 
-- Qué hace `Laboratorista` en el flujo de consultas, ya que el laboratorio trabaja con órdenes y resultados.
-- Si órdenes, resultados, controles de crecimiento y vacunas se exponen como puertos adicionales. No forman parte del contrato común; se pueden añadir en un puerto propio sin afectar a los demás motores.
+- **Laboratorista:** registra órdenes y resultados. Conserva los permisos clínicos de `roles.js`, que son los que usa el contrato común de consultas.
+- **Órdenes, resultados, controles y vacunas:** son puertos adicionales (`ports/repositoriosEspecializados.js`), no parte del contrato común. El adaptador los expone como `examenes` (MongoDB) y `seguimiento` (Firebase), con rutas `/api/laboratorio` y `/api/pediatria`. Una institución que no los tiene responde 422.

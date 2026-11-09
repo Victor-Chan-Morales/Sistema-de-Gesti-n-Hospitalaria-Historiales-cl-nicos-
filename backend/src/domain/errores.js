@@ -40,6 +40,13 @@ class ConsultaDuplicada extends RegistroDuplicado {
   }
 }
 
+// Un profesional o un paciente ya tienen una cita o consulta a esa misma hora.
+class ConflictoHorario extends ErrorDominio {
+  constructor(mensaje = 'El horario ya está ocupado.') {
+    super(mensaje, 'CONFLICTO_HORARIO');
+  }
+}
+
 class MotorNoDisponible extends ErrorDominio {
   constructor(institucion = 'la institución') {
     super(`Servicio de ${institucion} temporalmente no disponible.`, 'MOTOR_NO_DISPONIBLE');
@@ -65,6 +72,7 @@ module.exports = {
   NoEncontrado,
   RegistroDuplicado,
   ConsultaDuplicada,
+  ConflictoHorario,
   MotorNoDisponible,
   NoAutorizado,
   Prohibido,

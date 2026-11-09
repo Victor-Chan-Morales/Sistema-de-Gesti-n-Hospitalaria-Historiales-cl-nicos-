@@ -26,7 +26,17 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
     let diagnosticos;
     let medicamentos;
     let alergias;
-    const horaBase = '3000-06-15T10:00:00';
+    let otroUsuario;
+
+    // Cada prueba usa horas propias: las citas y consultas de una prueba (o de una ejecución
+    // anterior sobre la misma base) no pueden chocar con las de otra. Año 3000: queda dentro de la
+    // ventana de duplicados que usan las pruebas.
+    const horaUnica = () => {
+      const segundos = Math.floor(Math.random() * 365 * 86400);
+      return new Date(Date.UTC(3000, 0, 1) + segundos * 1000).toISOString().slice(0, 19);
+    };
+    const desplazar = (fechaHora, segundos) =>
+      new Date(Date.parse(`${fechaHora}Z`) + segundos * 1000).toISOString().slice(0, 19);
 
     const unico = () => randomUUID().slice(0, 12);
 
@@ -58,7 +68,7 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
     const nuevaAtencion = (idPaciente, extra = {}) => ({
       id_paciente: idPaciente,
       id_usuario_profesional: actor.id_usuario,
-      fecha_hora: horaBase,
+      fecha_hora: horaUnica(),
       motivo_consulta: `Motivo ${unico()}`,
       sintomas: 'Fiebre',
       examen_fisico: 'Normal',
@@ -77,6 +87,10 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
       profesional = await repos.usuarios.buscarPorNombre(usuarioProfesional);
       assert.ok(admin && profesional, 'Faltan los usuarios del seeder: ejecuta npm run seed');
       actor = { id_usuario: profesional.id_usuario, id_institucion: idInstitucion, rol: profesional.rol };
+      // Un segundo usuario para probar choques entre profesionales distintos; si el seeder solo tiene
+      // uno profesional, se usa el administrador (el puerto no exige rol al agendar).
+      const profesionales = await repos.usuarios.listarProfesionales();
+      otroUsuario = profesionales.find((u) => u.id_usuario !== profesional.id_usuario) ?? admin;
       diagnosticos = await repos.catalogos.diagnosticos();
       medicamentos = await repos.catalogos.medicamentos();
       alergias = await repos.catalogos.alergias();
@@ -177,6 +191,16 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
       assert.equal(historial.motivo_cierre, 'Traslado');
     });
 
+    it('pacientes: archivar cancela sus citas que seguían programadas', async () => {
+      const horaBase = horaUnica();
+      const { id_paciente: id } = await repos.pacientes.crear(nuevoPaciente(), actor);
+      const cita = await repos.citas.crear({
+        id_paciente: id, id_institucion: idInstitucion, id_usuario_profesional: profesional.id_usuario, fecha_hora: horaBase,
+      }, actor);
+      await repos.pacientes.archivar(id, { estado: 'Archivado', motivo: 'Traslado', fecha: '2026-01-15' }, actor);
+      assert.equal((await repos.citas.obtener(cita.id_cita)).estado, 'Cancelada');
+    });
+
     it('historiales: agrega alergias y antecedentes, sin repetir alergia', async () => {
       const { id_paciente: id } = await repos.pacientes.crear(nuevoPaciente(), actor);
       const datos = {
@@ -209,6 +233,7 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
     });
 
     it('citas: crea, lista y actualiza con fecha y hora del contrato', async () => {
+      const horaBase = horaUnica();
       const { id_paciente: id } = await repos.pacientes.crear(nuevoPaciente(), actor);
       const cita = await repos.citas.crear({
         id_paciente: id,
@@ -232,6 +257,7 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
     });
 
     it('citas: dos envíos simultáneos idénticos dejan una sola cita', async () => {
+      const horaBase = horaUnica();
       const { id_paciente: id } = await repos.pacientes.crear(nuevoPaciente(), actor);
       const datos = {
         id_paciente: id,
@@ -246,7 +272,70 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
       assert.equal((await repos.citas.listar({ id_paciente: id })).length, 1);
     });
 
+    it('citas: un profesional no puede tener dos citas programadas a la misma hora', async () => {
+      const horaBase = horaUnica();
+      const a = await repos.pacientes.crear(nuevoPaciente(), actor);
+      const b = await repos.pacientes.crear(nuevoPaciente(), actor);
+      const cita = (idPaciente) => ({
+        id_paciente: idPaciente,
+        id_institucion: idInstitucion,
+        id_usuario_profesional: profesional.id_usuario,
+        fecha_hora: horaBase,
+      });
+      const primera = await repos.citas.crear(cita(a.id_paciente), actor);
+      await assert.rejects(repos.citas.crear(cita(b.id_paciente), actor), errores.ConflictoHorario);
+
+      // Cancelada, la hora vuelve a quedar libre.
+      await repos.citas.actualizar(primera.id_cita, { estado: 'Cancelada' }, actor);
+      assert.equal((await repos.citas.crear(cita(b.id_paciente), actor)).estado, 'Programada');
+    });
+
+    it('citas: un paciente no puede tener dos citas a la misma hora con profesionales distintos', async () => {
+      const horaBase = horaUnica();
+      const { id_paciente: id } = await repos.pacientes.crear(nuevoPaciente(), actor);
+      await repos.citas.crear({
+        id_paciente: id, id_institucion: idInstitucion, id_usuario_profesional: profesional.id_usuario, fecha_hora: horaBase,
+      }, actor);
+      await assert.rejects(repos.citas.crear({
+        id_paciente: id, id_institucion: idInstitucion, id_usuario_profesional: otroUsuario.id_usuario, fecha_hora: horaBase,
+      }, actor), errores.ConflictoHorario);
+    });
+
+    it('citas: reprogramar a una hora ocupada es un choque; la propia cita no choca consigo misma', async () => {
+      const horaA = horaUnica();
+      const horaB = horaUnica();
+      const a = await repos.pacientes.crear(nuevoPaciente(), actor);
+      const b = await repos.pacientes.crear(nuevoPaciente(), actor);
+      const citaA = await repos.citas.crear({
+        id_paciente: a.id_paciente, id_institucion: idInstitucion, id_usuario_profesional: profesional.id_usuario, fecha_hora: horaA,
+      }, actor);
+      const citaB = await repos.citas.crear({
+        id_paciente: b.id_paciente, id_institucion: idInstitucion, id_usuario_profesional: profesional.id_usuario, fecha_hora: horaB,
+      }, actor);
+
+      assert.equal((await repos.citas.actualizar(citaA.id_cita, { fecha_hora: horaA }, actor)).fecha_hora, horaA);
+      await assert.rejects(repos.citas.actualizar(citaB.id_cita, { fecha_hora: horaA }, actor), errores.ConflictoHorario);
+      assert.equal((await repos.citas.obtener(citaB.id_cita)).fecha_hora, horaB);
+    });
+
+    it('citas: dos pacientes que piden la misma hora al mismo profesional dejan una sola cita', async () => {
+      const horaBase = horaUnica();
+      const a = await repos.pacientes.crear(nuevoPaciente(), actor);
+      const b = await repos.pacientes.crear(nuevoPaciente(), actor);
+      const cita = (idPaciente) => ({
+        id_paciente: idPaciente, id_institucion: idInstitucion, id_usuario_profesional: profesional.id_usuario, fecha_hora: horaBase,
+      });
+      const resultados = await Promise.allSettled([
+        repos.citas.crear(cita(a.id_paciente), actor),
+        repos.citas.crear(cita(b.id_paciente), actor),
+      ]);
+      assert.equal(resultados.filter((r) => r.status === 'fulfilled').length, 1);
+      const rechazo = resultados.find((r) => r.status === 'rejected');
+      assert.ok(rechazo.reason instanceof errores.ConflictoHorario, String(rechazo.reason));
+    });
+
     it('consultas: registra la atención completa con los tipos del contrato', async () => {
+      const horaBase = horaUnica();
       const { id_paciente: id, id_historial: idHistorial } = await repos.pacientes.crear(nuevoPaciente(), actor);
       const cita = await repos.citas.crear({
         id_paciente: id,
@@ -258,7 +347,7 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
       const consulta = await repos.consultas.registrarAtencion(nuevaAtencion(id, {
         id_cita: cita.id_cita,
         signos_vitales: {
-          presion_arterial: '120/80', temperatura: 37.5, frecuencia_cardiaca: 70, peso: 65.25, talla: 1.7, fecha_registro: horaBase,
+          presion_arterial: '120/80', temperatura: 37.5, frecuencia_cardiaca: 70, peso: 65.25, talla: 170, fecha_registro: horaBase,
         },
         diagnosticos: [{ id_catalogo_diag: diagnosticos[0].id_catalogo_diag, tipo: 'Definitivo', fecha_registro: '2026-01-20' }],
         tratamientos: [{ descripcion: 'Reposo', fecha_inicio: '2026-01-20', estado: 'Activo' }],
@@ -287,6 +376,7 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
     });
 
     it('consultas: un fallo en la receta no deja consulta ni diagnóstico (atomicidad)', async () => {
+      const horaBase = horaUnica();
       const { id_paciente: id } = await repos.pacientes.crear(nuevoPaciente(), actor);
       const cita = await repos.citas.crear({
         id_paciente: id,
@@ -310,6 +400,7 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
     });
 
     it('consultas: rechaza una cita que no es del paciente, sin guardar nada', async () => {
+      const horaBase = horaUnica();
       const a = await repos.pacientes.crear(nuevoPaciente(), actor);
       const b = await repos.pacientes.crear(nuevoPaciente(), actor);
       const cita = await repos.citas.crear({
@@ -349,12 +440,61 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
       const { id_paciente: id } = await repos.pacientes.crear(nuevoPaciente(), actor);
       const datos = nuevaAtencion(id);
       await repos.consultas.registrarAtencion(datos, actor, ventana());
+      const otraHora = horaUnica();
       const otra = await repos.consultas.registrarAtencion(
-        { ...datos, fecha_hora: '2001-01-01T10:00:00' },
+        { ...datos, fecha_hora: otraHora },
         actor,
-        { desde: '2001-01-01T09:59:30', hasta: '2001-01-01T10:00:30' },
+        { desde: desplazar(otraHora, -30), hasta: desplazar(otraHora, 30) },
       );
       assert.ok(otra.id_consulta);
+    });
+
+    it('consultas: un profesional no puede atender a dos pacientes a la misma hora', async () => {
+      const horaBase = horaUnica();
+      const a = await repos.pacientes.crear(nuevoPaciente(), actor);
+      const b = await repos.pacientes.crear(nuevoPaciente(), actor);
+      await repos.consultas.registrarAtencion(nuevaAtencion(a.id_paciente, { fecha_hora: horaBase }), actor, ventana());
+      await assert.rejects(
+        repos.consultas.registrarAtencion(nuevaAtencion(b.id_paciente, { fecha_hora: horaBase }), actor, ventana()),
+        errores.ConflictoHorario,
+      );
+    });
+
+    it('consultas: un paciente no puede tener dos consultas a la misma hora con profesionales distintos', async () => {
+      const horaBase = horaUnica();
+      const { id_paciente: id } = await repos.pacientes.crear(nuevoPaciente(), actor);
+      await repos.consultas.registrarAtencion(nuevaAtencion(id, { fecha_hora: horaBase }), actor, ventana());
+      await assert.rejects(
+        repos.consultas.registrarAtencion(nuevaAtencion(id, {
+          fecha_hora: horaBase, id_usuario_profesional: otroUsuario.id_usuario,
+        }), actor, ventana()),
+        errores.ConflictoHorario,
+      );
+    });
+
+    it('consultas: dos pacientes simultáneos a la misma hora del mismo profesional dejan una sola consulta', async () => {
+      const horaBase = horaUnica();
+      const a = await repos.pacientes.crear(nuevoPaciente(), actor);
+      const b = await repos.pacientes.crear(nuevoPaciente(), actor);
+      const resultados = await Promise.allSettled([
+        repos.consultas.registrarAtencion(nuevaAtencion(a.id_paciente, { fecha_hora: horaBase }), actor, ventana()),
+        repos.consultas.registrarAtencion(nuevaAtencion(b.id_paciente, { fecha_hora: horaBase }), actor, ventana()),
+      ]);
+      assert.equal(resultados.filter((r) => r.status === 'fulfilled').length, 1);
+      const rechazo = resultados.find((r) => r.status === 'rejected');
+      assert.ok(rechazo.reason instanceof errores.ConflictoHorario, String(rechazo.reason));
+    });
+
+    it('consultas: anular una consulta cancela la cita que la originó', async () => {
+      const horaBase = horaUnica();
+      const { id_paciente: id } = await repos.pacientes.crear(nuevoPaciente(), actor);
+      const cita = await repos.citas.crear({
+        id_paciente: id, id_institucion: idInstitucion, id_usuario_profesional: profesional.id_usuario, fecha_hora: horaBase,
+      }, actor);
+      const consulta = await repos.consultas.registrarAtencion(nuevaAtencion(id, { id_cita: cita.id_cita }), actor, ventana());
+      assert.equal((await repos.citas.obtener(cita.id_cita)).estado, 'Atendida');
+      await repos.consultas.cambiarEstado(consulta.id_consulta, 'Anulada', actor);
+      assert.equal((await repos.citas.obtener(cita.id_cita)).estado, 'Cancelada');
     });
 
     it('consultas: agrega detalle y cambia estado', async () => {

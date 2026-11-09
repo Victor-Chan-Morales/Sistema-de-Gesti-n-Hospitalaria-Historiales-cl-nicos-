@@ -17,6 +17,8 @@ tags:
   - name: Citas
   - name: Consultas
   - name: Catálogos
+  - name: Laboratorio
+  - name: Pediatría
   - name: Salud
 
 paths:
@@ -544,6 +546,233 @@ paths:
                     apellidos: { type: string }
                     rol: { type: string }
 
+  /api/laboratorio/tipos-examen:
+    get:
+      tags: [Laboratorio]
+      summary: Tipos de examen activos del laboratorio
+      description: 'Solo en el Laboratorio Clínico (MongoDB). Otra institución recibe 422.'
+      parameters:
+        - { name: texto, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          description: Tipos de examen
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TipoExamen' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+        '503': { $ref: '#/components/responses/MotorNoDisponible' }
+  /api/laboratorio/ordenes:
+    get:
+      tags: [Laboratorio]
+      summary: Órdenes de laboratorio, con sus resultados
+      description: 'Roles: profesionales de salud. Más recientes primero.'
+      parameters:
+        - { name: id_paciente, in: query, required: false, schema: { type: string } }
+        - { name: estado, in: query, required: false, schema: { $ref: '#/components/schemas/EstadoOrden' } }
+      responses:
+        '200':
+          description: Órdenes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OrdenLaboratorio' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+        '503': { $ref: '#/components/responses/MotorNoDisponible' }
+    post:
+      tags: [Laboratorio]
+      summary: Registra una orden con uno o varios exámenes
+      description: >
+        Roles: profesionales de salud. El paciente debe estar Activo. Una orden idéntica en un margen
+        de 30 segundos produce 409. Si no se indica solicitante, es el usuario del token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrdenLaboratorioEntrada' }
+      responses:
+        '201':
+          description: Orden creada en estado Pendiente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrdenLaboratorio' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Duplicado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+        '503': { $ref: '#/components/responses/MotorNoDisponible' }
+  /api/laboratorio/ordenes/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Laboratorio]
+      summary: Orden con sus resultados
+      responses:
+        '200':
+          description: Orden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrdenLaboratorio' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+  /api/laboratorio/ordenes/{id}/estado:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    patch:
+      tags: [Laboratorio]
+      summary: Cambia el estado de una orden
+      description: >
+        Transiciones: Pendiente a En proceso o Cancelada; En proceso a Finalizada o Cancelada;
+        Finalizada a Entregada. Una orden pasa sola a En proceso y a Finalizada al registrar resultados.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              properties:
+                estado: { $ref: '#/components/schemas/EstadoOrden' }
+      responses:
+        '200':
+          description: Orden actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrdenLaboratorio' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+  /api/laboratorio/ordenes/{id}/resultados:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    post:
+      tags: [Laboratorio]
+      summary: Registra el resultado de un examen de la orden
+      description: >
+        Roles: profesionales de salud. El examen debe formar parte de la orden y no tener resultado.
+        El resultado y el estado de la orden se guardan como una unidad. El laboratorista queda
+        registrado a partir del token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResultadoEntrada' }
+      responses:
+        '201':
+          description: Orden con el nuevo resultado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrdenLaboratorio' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Duplicado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+        '503': { $ref: '#/components/responses/MotorNoDisponible' }
+  /api/pediatria/vacunas:
+    get:
+      tags: [Pediatría]
+      summary: Catálogo de vacunas activas
+      description: 'Solo en el Centro Médico Pediátrico (Firebase). Otra institución recibe 422.'
+      responses:
+        '200':
+          description: Vacunas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Vacuna' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+        '503': { $ref: '#/components/responses/MotorNoDisponible' }
+  /api/pediatria/pacientes/{id}/controles:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Pediatría]
+      summary: Controles de crecimiento del paciente, del más reciente al más antiguo
+      responses:
+        '200':
+          description: Controles
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ControlCrecimiento' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+    post:
+      tags: [Pediatría]
+      summary: Registra un control de crecimiento
+      description: >
+        Roles: profesionales de salud. El paciente debe estar Activo y ser menor de 18 años. Si no se
+        envía indice_masa_corporal, se calcula con peso (kg) y talla (cm).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ControlCrecimientoEntrada' }
+      responses:
+        '201':
+          description: Control registrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ControlCrecimiento' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+        '503': { $ref: '#/components/responses/MotorNoDisponible' }
+  /api/pediatria/pacientes/{id}/vacunas:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [Pediatría]
+      summary: Registro de vacunación del paciente, de la más reciente a la más antigua
+      responses:
+        '200':
+          description: Registro de vacunación
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RegistroVacuna' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+    post:
+      tags: [Pediatría]
+      summary: Registra una dosis de vacuna
+      description: >
+        Roles: profesionales de salud. El paciente debe estar Activo y ser menor de 18 años. Repetir el
+        mismo registro (misma vacuna, dosis y fecha de aplicación) produce 409. Una dosis repetible, como
+        un refuerzo, se admite en otra fecha.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegistroVacunaEntrada' }
+      responses:
+        '201':
+          description: Dosis registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistroVacuna' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Duplicado' }
+        '422': { $ref: '#/components/responses/ReglaNegocio' }
+        '503': { $ref: '#/components/responses/MotorNoDisponible' }
+
   /health:
     get:
       tags: [Salud]
@@ -844,7 +1073,7 @@ components:
         frecuencia_cardiaca: { type: integer, nullable: true }
         frecuencia_respiratoria: { type: integer, nullable: true }
         peso: { type: number, nullable: true }
-        talla: { type: number, nullable: true }
+        talla: { type: number, nullable: true, description: cm }
         saturacion_oxigeno: { type: integer, nullable: true }
     ConsultaEntrada:
       type: object
@@ -932,3 +1161,142 @@ components:
           type: array
           description: Alergias del paciente relacionadas con lo recetado. Avisan, no bloquean.
           items: { type: string }
+    EstadoOrden:
+      type: string
+      enum: [Pendiente, En proceso, Finalizada, Entregada, Cancelada]
+    TipoExamen:
+      type: object
+      properties:
+        id_tipo_examen: { type: string }
+        nombre: { type: string }
+        descripcion: { type: string, nullable: true }
+        tipo_muestra: { type: string, nullable: true }
+        estado: { type: string, enum: [Activo, Inactivo] }
+    OrdenLaboratorioEntrada:
+      type: object
+      required: [id_paciente, examenes]
+      properties:
+        id_paciente: { type: string }
+        id_usuario_solicitante: { type: string }
+        prioridad: { type: string, enum: [Normal, Urgente, Emergencia], default: Normal }
+        observaciones: { type: string }
+        examenes:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [id_tipo_examen]
+            properties:
+              id_tipo_examen: { type: string }
+    ValorDetallado:
+      type: object
+      description: Parámetro medido. Cada tipo de examen trae los suyos.
+      required: [parametro, valor]
+      properties:
+        parametro: { type: string, maxLength: 100, example: Hemoglobina }
+        valor: { type: string, maxLength: 100, example: '13.5' }
+        unidad: { type: string, nullable: true, maxLength: 30, example: g/dL }
+        rango_referencia: { type: string, nullable: true, maxLength: 100, example: 12-16 }
+    ResultadoEntrada:
+      type: object
+      required: [id_tipo_examen]
+      properties:
+        id_tipo_examen: { type: string }
+        fecha_toma_muestra: { type: string, format: date }
+        fecha_resultado: { type: string, format: date, description: Hoy si se omite }
+        resultado_general: { type: string }
+        valores_detallados:
+          type: array
+          items: { $ref: '#/components/schemas/ValorDetallado' }
+        observaciones: { type: string }
+    ResultadoLaboratorio:
+      type: object
+      properties:
+        id_resultado: { type: string }
+        id_orden_laboratorio: { type: string }
+        id_tipo_examen: { type: string }
+        fecha_toma_muestra: { type: string, format: date, nullable: true }
+        fecha_resultado: { type: string, format: date }
+        resultado_general: { type: string, nullable: true }
+        valores_detallados:
+          type: array
+          items: { $ref: '#/components/schemas/ValorDetallado' }
+        observaciones: { type: string, nullable: true }
+        id_usuario_laboratorista: { type: string }
+    OrdenLaboratorio:
+      type: object
+      properties:
+        id_orden_laboratorio: { type: string }
+        id_historial: { type: string }
+        id_paciente: { type: string }
+        id_usuario_solicitante: { type: string, nullable: true }
+        fecha_orden: { type: string, example: '2026-03-01T09:30:00' }
+        prioridad: { type: string, enum: [Normal, Urgente, Emergencia] }
+        estado: { $ref: '#/components/schemas/EstadoOrden' }
+        observaciones: { type: string, nullable: true }
+        examenes:
+          type: array
+          items:
+            type: object
+            properties:
+              id_tipo_examen: { type: string }
+              nombre: { type: string }
+              tipo_muestra: { type: string, nullable: true }
+        resultados:
+          type: array
+          items: { $ref: '#/components/schemas/ResultadoLaboratorio' }
+    Vacuna:
+      type: object
+      properties:
+        id_vacuna: { type: string }
+        nombre: { type: string }
+        enfermedad_prevenida: { type: string, nullable: true }
+        numero_dosis_requeridas: { type: integer, nullable: true }
+        descripcion: { type: string, nullable: true }
+        estado: { type: string, enum: [Activa, Inactiva] }
+    ControlCrecimientoEntrada:
+      type: object
+      properties:
+        fecha_control: { type: string, format: date, description: Hoy si se omite }
+        peso: { type: number, description: kg }
+        talla: { type: number, description: cm }
+        perimetro_cefalico: { type: number, description: cm }
+        indice_masa_corporal: { type: number, description: Se calcula si se omite }
+        id_consulta: { type: string }
+        observaciones: { type: string }
+    ControlCrecimiento:
+      type: object
+      properties:
+        id_control_crecimiento: { type: string }
+        id_historial: { type: string }
+        id_consulta: { type: string, nullable: true }
+        fecha_control: { type: string, format: date }
+        peso: { type: number, nullable: true }
+        talla: { type: number, nullable: true }
+        perimetro_cefalico: { type: number, nullable: true }
+        indice_masa_corporal: { type: number, nullable: true }
+        observaciones: { type: string, nullable: true }
+    RegistroVacunaEntrada:
+      type: object
+      required: [id_vacuna, numero_dosis]
+      properties:
+        id_vacuna: { type: string }
+        numero_dosis: { type: string, maxLength: 30, example: Primera }
+        fecha_aplicacion: { type: string, format: date, description: Hoy si se omite }
+        lote: { type: string, maxLength: 50 }
+        centro_aplicacion: { type: string, maxLength: 100 }
+        proxima_dosis: { type: string, format: date }
+        observaciones: { type: string }
+    RegistroVacuna:
+      type: object
+      properties:
+        id_registro_vacuna: { type: string }
+        id_historial: { type: string }
+        id_vacuna: { type: string }
+        nombre_vacuna: { type: string }
+        numero_dosis: { type: string }
+        fecha_aplicacion: { type: string, format: date }
+        lote: { type: string, nullable: true }
+        centro_aplicacion: { type: string, nullable: true }
+        proxima_dosis: { type: string, format: date, nullable: true }
+        observaciones: { type: string, nullable: true }

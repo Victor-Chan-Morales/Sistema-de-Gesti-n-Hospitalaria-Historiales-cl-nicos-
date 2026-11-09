@@ -1,4 +1,4 @@
-const { NoEncontrado, ReglaNegocio, RegistroDuplicado, ConsultaDuplicada } = require('../../../domain/errores');
+const { NoEncontrado, ReglaNegocio, RegistroDuplicado, ConsultaDuplicada, ConflictoHorario } = require('../../../domain/errores');
 const { ahora, hoy } = require('../../../domain/fechas');
 const { ROLES_PROFESIONALES } = require('../../../domain/roles');
 const { esIdValido, idReferencia, envolverRepositorios } = require('../sql-comun/mapeadores');
@@ -28,6 +28,53 @@ function auditar(cx, actor, accion, entidad, idEntidad) {
     id_entidad: String(idEntidad),
     fecha_hora: ahora(),
   });
+}
+
+// --- Agenda: choques de horario ---
+
+const MENSAJE_CITA_PROFESIONAL = 'El profesional ya tiene una cita programada a esa misma hora.';
+const MENSAJE_CITA_PACIENTE = 'El paciente ya tiene una cita programada a esa misma hora.';
+const MENSAJE_CONSULTA_PROFESIONAL = 'El profesional ya tiene una consulta registrada a esa misma hora.';
+const MENSAJE_CONSULTA_PACIENTE = 'El paciente ya tiene una consulta registrada a esa misma hora.';
+
+// Bloquea la fila del profesional: dos atenciones suyas se validan una después de otra.
+// Orden fijo de bloqueos en todo el adaptador: primero el paciente, luego el profesional.
+async function bloquearProfesional(cx, idProfesional) {
+  if (!esIdValido(idProfesional)) return;
+  await cx.unica('SELECT id_usuario FROM Usuario WHERE id_usuario = ? FOR UPDATE', [idProfesional]);
+}
+
+async function bloquearAgenda(cx, idPaciente, idProfesional) {
+  await cx.unica('SELECT id_paciente FROM Paciente WHERE id_paciente = ? FOR UPDATE', [idPaciente]);
+  await bloquearProfesional(cx, idProfesional);
+}
+
+// Regla: un profesional, o un paciente, no puede tener dos citas Programadas a la misma hora.
+async function exigirHorarioCitaLibre(cx, { idCita, idPaciente, idProfesional, fechaHora }) {
+  const choque = await cx.unica(
+    `SELECT id_usuario_profesional FROM Cita
+     WHERE estado = 'Programada' AND fecha_hora = ? AND id_cita <> ?
+       AND (id_usuario_profesional = ? OR id_paciente = ?)
+     LIMIT 1`,
+    [fechaHora, idCita ?? 0, idProfesional, idPaciente],
+  );
+  if (!choque) return;
+  const delProfesional = String(choque.id_usuario_profesional) === String(idProfesional);
+  throw new ConflictoHorario(delProfesional ? MENSAJE_CITA_PROFESIONAL : MENSAJE_CITA_PACIENTE);
+}
+
+// Regla: un profesional, o un paciente, no puede tener dos consultas a la misma hora.
+async function exigirHorarioConsultaLibre(cx, { idHistorial, idProfesional, fechaHora }) {
+  const choque = await cx.unica(
+    `SELECT id_usuario_profesional FROM Consulta
+     WHERE estado <> 'Anulada' AND fecha_hora = ?
+       AND (id_usuario_profesional = ? OR id_historial = ?)
+     LIMIT 1`,
+    [fechaHora, idProfesional, idHistorial],
+  );
+  if (!choque) return;
+  const delProfesional = String(choque.id_usuario_profesional) === String(idProfesional);
+  throw new ConflictoHorario(delProfesional ? MENSAJE_CONSULTA_PROFESIONAL : MENSAJE_CONSULTA_PACIENTE);
 }
 
 // --- Colecciones del paciente ---
@@ -309,6 +356,11 @@ function crearRepositorios(cn) {
           fecha_cierre: fecha,
           motivo_cierre: motivo,
         }, 'id_paciente', id);
+        // Regla: al archivar, las citas que siguen programadas se cancelan.
+        await cx.ejecutar(
+          "UPDATE Cita SET estado = 'Cancelada' WHERE id_paciente = ? AND estado = 'Programada'",
+          [id],
+        );
         await auditar(cx, actor, 'ARCHIVAR', 'Paciente', id);
         return cargarPaciente(cx, id);
       });
@@ -383,6 +435,10 @@ function crearRepositorios(cn) {
         [idPaciente, idProfesional, datos.fecha_hora],
       );
       if (duplicada) throw new RegistroDuplicado('El paciente ya tiene una cita idéntica programada.');
+      await bloquearProfesional(cx, idProfesional);
+      await exigirHorarioCitaLibre(cx, {
+        idCita: null, idPaciente, idProfesional, fechaHora: datos.fecha_hora,
+      });
 
       const id = await cx.insertar('Cita', {
         id_paciente: idPaciente,
@@ -426,6 +482,19 @@ function crearRepositorios(cn) {
         const valores = elegir(cambios, [
           'id_usuario_profesional', 'fecha_hora', 'motivo_consulta', 'observaciones', 'estado',
         ]);
+        const actual = await cx.unica('SELECT * FROM Cita WHERE id_cita = ?', [id]);
+        if (!actual) throw new NoEncontrado('La cita no existe.');
+        const resultante = { ...actual, ...valores };
+        if (resultante.estado === 'Programada'
+          && (valores.fecha_hora !== undefined || valores.id_usuario_profesional !== undefined)) {
+          await bloquearAgenda(cx, actual.id_paciente, resultante.id_usuario_profesional);
+          await exigirHorarioCitaLibre(cx, {
+            idCita: id,
+            idPaciente: actual.id_paciente,
+            idProfesional: resultante.id_usuario_profesional,
+            fechaHora: resultante.fecha_hora,
+          });
+        }
         if (Object.keys(valores).length > 0) await cx.actualizar('Cita', valores, 'id_cita', id);
         await auditar(cx, actor, 'ACTUALIZAR', 'Cita', id);
         const cita = await cx.unica('SELECT * FROM Cita WHERE id_cita = ?', [id]);
@@ -460,6 +529,10 @@ function crearRepositorios(cn) {
         ],
       );
       if (duplicada) throw new ConsultaDuplicada();
+      await bloquearProfesional(cx, datos.id_usuario_profesional);
+      await exigirHorarioConsultaLibre(cx, {
+        idHistorial, idProfesional: datos.id_usuario_profesional, fechaHora: datos.fecha_hora,
+      });
 
       const idConsulta = await cx.insertar('Consulta', {
         id_historial: idHistorial,
@@ -500,6 +573,13 @@ function crearRepositorios(cn) {
       return cn.transaccion(async (cx) => {
         const filas = await cx.actualizar('Consulta', { estado }, 'id_consulta', id);
         if (filas === 0) throw new NoEncontrado('La consulta no existe.');
+        // Regla: anular una consulta cancela la cita que la originó, si figuraba como atendida.
+        if (estado === 'Anulada') {
+          await cx.ejecutar(
+            "UPDATE Cita SET estado = 'Cancelada' WHERE estado = 'Atendida' AND id_cita = (SELECT id_cita FROM Consulta WHERE id_consulta = ?)",
+            [id],
+          );
+        }
         await auditar(cx, actor, `ESTADO_${estado.toUpperCase()}`, 'Consulta', id);
         return cargarConsulta(cx, id);
       });

@@ -11,6 +11,8 @@ const { crearRutasPacientes } = require('./adapters/http/rutas/pacientes');
 const { crearRutasCitas } = require('./adapters/http/rutas/citas');
 const { crearRutasConsultas } = require('./adapters/http/rutas/consultas');
 const { crearRutasCatalogos } = require('./adapters/http/rutas/catalogos');
+const { crearRutasLaboratorio } = require('./adapters/http/rutas/laboratorio');
+const { crearRutasPediatria } = require('./adapters/http/rutas/pediatria');
 
 const RUTA_FRONTEND = path.resolve(__dirname, '../../frontend');
 const RUTA_OPENAPI = path.resolve(__dirname, '../../docs/openapi.yaml');
@@ -46,6 +48,9 @@ function crearApp({ obtenerRepositorio, listarInstituciones, credenciales, token
   app.use('/api/citas', protegido, crearRutasCitas());
   app.use('/api/consultas', protegido, crearRutasConsultas());
   app.use('/api/catalogos', protegido, crearRutasCatalogos());
+  // Funciones propias de cada institución: solo responden en el motor que las tiene.
+  app.use('/api/laboratorio', protegido, crearRutasLaboratorio());
+  app.use('/api/pediatria', protegido, crearRutasPediatria());
 
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(YAML.parse(fs.readFileSync(RUTA_OPENAPI, 'utf8'))));
   app.use('/api', rutaNoEncontrada);

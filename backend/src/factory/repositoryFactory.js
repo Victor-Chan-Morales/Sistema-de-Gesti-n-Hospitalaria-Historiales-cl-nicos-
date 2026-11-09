@@ -5,16 +5,18 @@ const { MotorNoDisponible } = require('../domain/errores');
 const { CONTRATO, verificarPuerto } = require('../ports/repositorioClinico');
 const { motorDeInstitucion, nombreDeInstitucion, idsDeInstituciones } = require('../config/instituciones');
 
-// Integrante B: reemplazar null por el require de su adaptador, igual que en postgres y mysql.
+// Los adaptadores se cargan al usarse: así un motor cuyo driver no está instalado o cuyas
+// credenciales faltan no impide arrancar ni afecta a los demás.
 const FABRICAS = {
   postgres: (etiqueta) => require('../adapters/persistence/postgres').crearAdaptador(etiqueta),
   mysql: (etiqueta) => require('../adapters/persistence/mysql').crearAdaptador(etiqueta),
-  mongo: null,
-  firebase: null,
+  mongo: (etiqueta) => require('../adapters/persistence/mongo').crearAdaptador(etiqueta),
+  firebase: (etiqueta) => require('../adapters/persistence/firebase').crearAdaptador(etiqueta),
 };
 
-// Mientras un motor no exista, sus operaciones responden como un servicio no disponible
-// (503) en lugar de un error interno, y el resto del sistema sigue funcionando.
+// Si un motor no tiene adaptador (FABRICAS[motor] es null), sus operaciones responden como un
+// servicio no disponible (503) en lugar de un error interno, y el resto del sistema sigue
+// funcionando.
 function crearStub(etiqueta) {
   const stub = {};
   for (const [repositorio, metodos] of Object.entries(CONTRATO)) {
@@ -62,4 +64,4 @@ async function cerrarConexiones() {
   cache.clear();
 }
 
-module.exports = { obtenerRepositorio, listarInstituciones, cerrarConexiones };
+module.exports = { obtenerRepositorio, listarInstituciones, cerrarConexiones, crearStub };

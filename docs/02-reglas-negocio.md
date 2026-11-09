@@ -19,6 +19,13 @@ Las reglas viven en `backend/src/domain/reglas.js`, son iguales para los cuatro 
 - Una cita `Atendida`, `Cancelada` o `No Asistió` ya no se puede modificar.
 - Estados de la consulta: `Abierta` puede pasar a `Finalizada` o `Anulada`, y `Finalizada` a `Anulada`. A una consulta anulada no se le agregan datos.
 - Una receta debe incluir al menos un medicamento.
+- **Choques de horario:** un profesional no puede tener dos citas `Programada` a la misma hora, ni dos consultas no anuladas a la misma hora; un paciente tampoco puede tener dos (con profesionales distintos, por ejemplo). La comprobación va dentro de la transacción de cada motor, bloqueando al profesional y al paciente, y responde 409 `CONFLICTO_HORARIO`. Las citas no tienen duración en el modelo: el choque es de hora exacta. Una cita no choca consigo misma al reprogramarse.
+- Una cita no se marca `Atendida` a mano: pasa a `Atendida` solo al registrar su consulta.
+- Al anular una consulta, la cita que la originó pasa a `Cancelada` si figuraba como `Atendida`.
+- Al archivar un paciente, sus citas que seguían `Programada` pasan a `Cancelada`, en la misma transacción que el archivado.
+- Una consulta no se registra con fecha futura ni antes del nacimiento del paciente. Si va ligada a una cita, la registra el profesional al que la cita está asignada.
+- **Laboratorio:** una orden con resultados ya registrados no se cancela (los resultados no se borran). Un resultado debe traer el resultado general o al menos un valor. La muestra no puede tomarse antes de la fecha de la orden, y ninguna fecha de muestra o de resultado puede ser futura.
+- **Pediatría:** un control de crecimiento o una vacuna no puede tener fecha anterior al nacimiento del paciente.
 
 ## Eliminación lógica
 

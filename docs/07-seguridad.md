@@ -47,6 +47,6 @@ Según la Entrega I:
 
 ## Limitaciones conocidas
 
-- El login no limita los intentos fallidos.
-- Un token sigue siendo válido hasta que expira, aunque el usuario se desactive.
+- El login no limita los intentos fallidos. Es una decisión de alcance de esta entrega: no se implementa.
+- Un token sigue siendo válido hasta que expira, aunque el usuario se desactive. Decisión de alcance: no se implementa revocación en esta entrega.
 - El frontend y la API corren sobre HTTP en desarrollo. En un despliegue real requieren HTTPS.

@@ -1,7 +1,9 @@
 // Implementación completa del puerto en memoria. Sirve para probar el núcleo sin Docker,
 // y como ejemplo mínimo de lo que debe hacer un adaptador: pasa la misma suite de contrato.
 
-const { NoEncontrado, ReglaNegocio, RegistroDuplicado, ConsultaDuplicada, DatosInvalidos } = require('../../../src/domain/errores');
+const {
+  NoEncontrado, ReglaNegocio, RegistroDuplicado, ConsultaDuplicada, DatosInvalidos, ConflictoHorario,
+} = require('../../../src/domain/errores');
 const { hoy } = require('../../../src/domain/fechas');
 const { ROLES_PROFESIONALES } = require('../../../src/domain/roles');
 
@@ -75,6 +77,27 @@ function crearRepoMemoria() {
     }),
   });
 
+  // Choques de horario, igual que en los adaptadores: un profesional o un paciente no pueden
+  // tener dos citas Programadas (o dos consultas no anuladas) a la misma hora.
+  const exigirHorarioCitaLibre = (idCita, idPaciente, idProfesional, fechaHora) => {
+    const choque = [...bd.citas.values()].find((c) => c.id_cita !== idCita && c.estado === 'Programada'
+      && c.fecha_hora === fechaHora
+      && (c.id_usuario_profesional === idProfesional || c.id_paciente === idPaciente));
+    if (!choque) return;
+    throw new ConflictoHorario(choque.id_usuario_profesional === idProfesional
+      ? 'El profesional ya tiene una cita programada a esa misma hora.'
+      : 'El paciente ya tiene una cita programada a esa misma hora.');
+  };
+
+  const exigirHorarioConsultaLibre = (idPaciente, idHistorial, idProfesional, fechaHora) => {
+    const choque = [...bd.consultas.values()].find((c) => c.estado !== 'Anulada' && c.fecha_hora === fechaHora
+      && (c.id_usuario_profesional === idProfesional || c.id_historial === idHistorial));
+    if (!choque) return;
+    throw new ConflictoHorario(choque.id_usuario_profesional === idProfesional
+      ? 'El profesional ya tiene una consulta registrada a esa misma hora.'
+      : 'El paciente ya tiene una consulta registrada a esa misma hora.');
+  };
+
   const repos = {
     usuarios: {
       buscarPorNombre: async (usuario) => copia([...bd.usuarios.values()].find((u) => u.usuario === usuario)) ?? null,
@@ -136,6 +159,9 @@ function crearRepoMemoria() {
         const paciente = exigir(bd.pacientes, id, 'El paciente no existe.');
         Object.assign(paciente, { estado, motivo_baja: motivo });
         Object.assign(bd.historiales.get(String(id)).historial, { estado: 'Archivado', fecha_cierre: fecha, motivo_cierre: motivo });
+        for (const c of bd.citas.values()) {
+          if (c.id_paciente === String(id) && c.estado === 'Programada') c.estado = 'Cancelada';
+        }
         auditar(actor, 'ARCHIVAR', 'Paciente', id);
         return vista(paciente);
       },
@@ -184,6 +210,7 @@ function crearRepoMemoria() {
           && c.id_usuario_profesional === datos.id_usuario_profesional
           && c.fecha_hora === datos.fecha_hora && c.estado === 'Programada');
         if (duplicada) throw new RegistroDuplicado('El paciente ya tiene una cita idéntica programada.');
+        exigirHorarioCitaLibre(null, datos.id_paciente, datos.id_usuario_profesional, datos.fecha_hora);
         const id = agregarFila(bd.citas, 'id_cita', {
           motivo_consulta: null, observaciones: null, ...copia(datos),
           id_institucion: String(datos.id_institucion), estado: 'Programada', fecha_creacion: hoy(),
@@ -201,6 +228,10 @@ function crearRepoMemoria() {
         .sort((a, b) => a.fecha_hora.localeCompare(b.fecha_hora))),
       async actualizar(id, cambios, actor) {
         const cita = exigir(bd.citas, id, 'La cita no existe.');
+        const resultante = { ...cita, ...copia(cambios) };
+        if (resultante.estado === 'Programada' && (cambios.fecha_hora !== undefined || cambios.id_usuario_profesional !== undefined)) {
+          exigirHorarioCitaLibre(String(id), resultante.id_paciente, resultante.id_usuario_profesional, resultante.fecha_hora);
+        }
         Object.assign(cita, copia(cambios));
         auditar(actor, 'ACTUALIZAR', 'Cita', id);
         return copia(cita);
@@ -219,6 +250,7 @@ function crearRepoMemoria() {
           && c.sintomas === (datos.sintomas ?? null)
           && c.notas_clinicas === (datos.notas_clinicas ?? null));
         if (duplicada) throw new ConsultaDuplicada();
+        exigirHorarioConsultaLibre(String(datos.id_paciente), h.id_historial, datos.id_usuario_profesional, datos.fecha_hora);
 
         // Se construye todo antes de guardar: si algo falla, no queda nada a medias.
         const diagnosticos = (datos.diagnosticos ?? []).map(diagnosticoCompleto);
@@ -254,6 +286,8 @@ function crearRepoMemoria() {
       async cambiarEstado(id, estado, actor) {
         const consulta = exigir(bd.consultas, id, 'La consulta no existe.');
         consulta.estado = estado;
+        const cita = consulta.id_cita ? bd.citas.get(String(consulta.id_cita)) : null;
+        if (estado === 'Anulada' && cita?.estado === 'Atendida') cita.estado = 'Cancelada';
         auditar(actor, `ESTADO_${estado.toUpperCase()}`, 'Consulta', id);
         return copia(consulta);
       },

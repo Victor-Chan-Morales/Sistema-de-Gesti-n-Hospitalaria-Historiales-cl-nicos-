@@ -10,8 +10,8 @@ Proyecto universitario (Universidad Rafael Landívar, Bases de Datos II): una pl
 |---|---|---|
 | Hospital General | PostgreSQL | `backend/db/postgres/01-hospital_general.sql` |
 | Clínica Odontológica | MySQL | `backend/db/mysql/01-clinica_odontologica.sql` |
-| Laboratorio Clínico | MongoDB | aún no creado |
-| Centro Médico Pediátrico | Firebase (Firestore) | aún no creado |
+| Laboratorio Clínico | MongoDB | `backend/src/adapters/persistence/mongo/` (colecciones e índices en `indices.js`) |
+| Centro Médico Pediátrico | Firebase (Firestore) | `backend/src/adapters/persistence/firebase/` (reglas en `backend/db/firebase/firestore.rules`) |
 
 Documentos de referencia (PDF) en la raíz del repositorio:
 - `Proyecto final bases II (1).pdf`: el enunciado oficial y la rúbrica (Entrega I: modelo relacional; Entrega II: aplicación cliente-servidor).
@@ -22,22 +22,25 @@ Leerlos con `pdftotext -layout <archivo> -` cuando haya dudas sobre los requisit
 
 ## Estado actual
 
-El núcleo hexagonal y los adaptadores de PostgreSQL y MySQL están implementados (Integrante A). MongoDB y Firebase están pendientes (Integrante B): `factory/repositoryFactory.js` los resuelve con un stub que responde 503. La guía para implementarlos está en `docs/guia-integrante-b.md`.
+El núcleo hexagonal y los cuatro adaptadores están implementados: PostgreSQL y MySQL (Integrante A), MongoDB y Firebase (Integrante B). Si un motor no tuviera adaptador, `factory/repositoryFactory.js` lo resuelve con un stub que responde 503. El frontend (Integrante C) está implementado: panel SPA por rol, con el QA en `frontend/qa/`. Las decisiones de modelado de MongoDB y Firebase están en `docs/04-modelo-documental.md` y `docs/08-comparativo.md`.
 
 ```bash
 cp .env.example .env                 # completar las variables
-docker compose up -d postgres mysql  # carga los SQL solo si el volumen es nuevo
+docker compose up -d postgres mysql mongo firestore  # los SQL se cargan solo si el volumen es nuevo
 cd backend && npm install
-npm run seed                         # repetible
+npm run seed                         # PostgreSQL y MySQL; repetible
+npm run seed:nosql                   # MongoDB y Firebase; repetible
 npm start                            # http://localhost:3000, docs en /api/docs
 npm test                             # unitarias y arquitectura, sin Docker
-npm run test:integracion             # contrato y equivalencia; requiere bases y seed
+npm run test:integracion             # contrato y equivalencia; requiere las cuatro bases y ambos seeds
 node --test --test-name-pattern="<patrón>" tests/unit/http.test.js   # una sola prueba
 ```
 
 Regla de dependencias: `adapters → application → domain`. El dominio, los puertos y los casos de uso no importan drivers ni Express (`tests/arquitectura.test.js` lo verifica). `factory/` y `server.js` son los únicos puntos que conectan adaptadores.
 
-Cualquier cambio al puerto (`ports/repositorioClinico.js`) debe reflejarse en todos los adaptadores, en `tests/unit/apoyo/repoMemoria.js` y en `tests/contrato/suiteRepositorio.js`. Los repositorios de PostgreSQL y MySQL son casi idénticos a propósito: al corregir uno, revisar el otro.
+Cualquier cambio al puerto (`ports/repositorioClinico.js`) debe reflejarse en los cuatro adaptadores, en `tests/unit/apoyo/repoMemoria.js` y en `tests/contrato/suiteRepositorio.js`. Los repositorios de PostgreSQL y MySQL son casi idénticos a propósito: al corregir uno, revisar el otro. Los de MongoDB y Firebase comparten utilidades en `adapters/persistence/nosql-comun/`.
+
+Las funciones propias de una institución (órdenes y resultados del laboratorio; controles y vacunas del pediátrico) no forman parte del contrato común: viven en `ports/repositoriosEspecializados.js`, se exponen como una propiedad adicional del adaptador (`examenes`, `seguimiento`) y sus rutas son `/api/laboratorio` y `/api/pediatria`.
 
 ## Arquitectura del esquema
 

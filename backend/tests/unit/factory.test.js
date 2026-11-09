@@ -1,6 +1,6 @@
 const { describe, it, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { obtenerRepositorio, listarInstituciones, cerrarConexiones } = require('../../src/factory/repositoryFactory');
+const { obtenerRepositorio, listarInstituciones, cerrarConexiones, crearStub } = require('../../src/factory/repositoryFactory');
 const { motorDeInstitucion } = require('../../src/config/instituciones');
 const { verificarPuerto, CONTRATO } = require('../../src/ports/repositorioClinico');
 const { MotorNoDisponible } = require('../../src/domain/errores');
@@ -28,15 +28,25 @@ describe('factory de repositorios', () => {
     assert.notEqual(obtenerRepositorio(1), obtenerRepositorio(2));
   });
 
-  it('los adaptadores de PostgreSQL y MySQL cumplen el puerto', () => {
-    assert.doesNotThrow(() => verificarPuerto(obtenerRepositorio(1)));
-    assert.doesNotThrow(() => verificarPuerto(obtenerRepositorio(2)));
+  it('los adaptadores de los cuatro motores cumplen el puerto sin conectarse', () => {
+    for (const id of [1, 2, 3, 4]) assert.doesNotThrow(() => verificarPuerto(obtenerRepositorio(id)));
+    assert.ok(listarInstituciones().every((i) => i.implementado));
   });
 
-  it('un motor pendiente responde como servicio no disponible y cumple el puerto', async () => {
-    const stub = verificarPuerto(obtenerRepositorio(3));
+  it('cada institución expone solo sus funciones propias', () => {
+    assert.equal(typeof obtenerRepositorio(3).examenes.registrarResultado, 'function');
+    assert.equal(typeof obtenerRepositorio(4).seguimiento.registrarVacuna, 'function');
+    for (const id of [1, 2]) {
+      assert.equal(obtenerRepositorio(id).examenes, undefined);
+      assert.equal(obtenerRepositorio(id).seguimiento, undefined);
+    }
+    assert.equal(obtenerRepositorio(3).seguimiento, undefined);
+    assert.equal(obtenerRepositorio(4).examenes, undefined);
+  });
+
+  it('un motor sin adaptador responde como servicio no disponible y cumple el puerto', async () => {
+    const stub = verificarPuerto(crearStub('Laboratorio Clínico'));
     await assert.rejects(stub.pacientes.obtener('1'), MotorNoDisponible);
-    assert.equal(listarInstituciones().find((i) => i.id_institucion === 3).implementado, false);
   });
 
   it('una institución desconocida no se enruta a ningún motor', () => {

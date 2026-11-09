@@ -4,9 +4,43 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panel - Red de hospitales</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script src="js/tema.js"></script>
+  <link rel="stylesheet" href="css/clinico.css">
 </head>
-<body class="min-h-screen bg-gray-100">
+<body>
+  <div id="avisos" class="fixed top-4 right-4 z-50 flex flex-col gap-2 items-end" aria-live="polite"></div>
+
+  <div class="marco">
+    <aside class="lateral">
+      <div class="marca">
+        <p class="marca-nombre">Red de hospitales</p>
+        <p id="institucion" class="marca-institucion"></p>
+      </div>
+      <nav id="navegacion" class="nav" aria-label="Secciones"></nav>
+      <div class="usuario">
+        <div id="datos-usuario"></div>
+        <button id="salir" type="button" class="enlace mt-2">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="contenido">
+      <div id="vista"></div>
+    </main>
+  </div>
+
+  <script src="js/sesion.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/utilidades.js"></script>
+  <script src="js/vistas/pacientes.js"></script>
+  <script src="js/vistas/citas.js"></script>
+  <script src="js/vistas/consultas.js"></script>
+  <script src="js/vistas/historial.js"></script>
+  <script src="js/vistas/laboratorio.js"></script>
+  <script src="js/vistas/pediatria.js"></script>
+  <script src="js/panel.js"></script>
 </body>
 </html>

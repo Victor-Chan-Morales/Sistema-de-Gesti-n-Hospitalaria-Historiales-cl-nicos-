@@ -87,6 +87,10 @@ function crearConexion(configuracion, etiqueta) {
     async transaccion(trabajo) {
       const conexion = await pool.getConnection();
       try {
+        // READ COMMITTED, como PostgreSQL. Con REPEATABLE READ, una comprobación de choques hecha
+        // después de esperar un bloqueo leería un snapshot anterior y no vería la cita que acaba de
+        // confirmar la transacción que tenía el bloqueo. Solo afecta a la siguiente transacción.
+        await conexion.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
         await conexion.beginTransaction();
         const resultado = await trabajo(crearOperaciones(conexion));
         await conexion.commit();

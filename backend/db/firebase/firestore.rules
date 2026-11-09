@@ -1,0 +1,12 @@
+// Reglas de seguridad de Firestore (Centro Médico Pediátrico).
+// Ningún cliente accede directamente: el navegador solo habla con el backend, y el backend usa
+// el SDK de administración, que no se rige por estas reglas. Denegar todo cierra la puerta a
+// cualquiera que obtenga la configuración pública del proyecto.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

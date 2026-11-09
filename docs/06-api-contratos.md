@@ -51,6 +51,14 @@ Todas las respuestas de error tienen la misma forma, y `mensaje` está listo par
 | `POST /api/consultas/:id/tratamientos` | Agrega un tratamiento | Registrar clínico |
 | `POST /api/consultas/:id/recetas` | Agrega una receta | Registrar clínico |
 | `GET /api/catalogos/{diagnosticos, medicamentos, alergias, profesionales}` | Catálogos | Sesión |
+| `GET /api/laboratorio/tipos-examen` | Tipos de examen del laboratorio | Ver clínico |
+| `GET, POST /api/laboratorio/ordenes` | Lista o crea órdenes de examen | Ver clínico / Registrar clínico |
+| `GET /api/laboratorio/ordenes/:id` | Orden con sus resultados | Ver clínico |
+| `PATCH /api/laboratorio/ordenes/:id/estado` | Avanza o cancela la orden | Registrar clínico |
+| `POST /api/laboratorio/ordenes/:id/resultados` | Carga el resultado de un examen | Registrar clínico |
+| `GET /api/pediatria/vacunas` | Catálogo de vacunas | Ver clínico |
+| `GET, POST /api/pediatria/pacientes/:id/controles` | Controles de crecimiento | Ver clínico / Registrar clínico |
+| `GET, POST /api/pediatria/pacientes/:id/vacunas` | Dosis aplicadas | Ver clínico / Registrar clínico |
 | `GET /health`, `GET /health/motores` | Estado del servidor y de cada motor | Público |
 
 La matriz de permisos por rol está en [`07-seguridad.md`](07-seguridad.md).
