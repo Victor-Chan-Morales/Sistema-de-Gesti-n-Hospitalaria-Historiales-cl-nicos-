@@ -16,7 +16,7 @@ const {
 const { ahora, hoy } = require('../../../domain/fechas');
 const { ROLES_PROFESIONALES } = require('../../../domain/roles');
 const {
-  COLUMNAS_PACIENTE, elegir, comoTexto, escaparRegex, registroAuditoria,
+  COLUMNAS_PACIENTE, elegir, comoTexto, comoIdInstitucion, aTextoInstitucion, escaparRegex, registroAuditoria,
 } = require('../nosql-comun/utilidades');
 
 // --- IDs y conversión ---
@@ -71,7 +71,7 @@ const CAMPOS_HISTORIAL = [
   'id_paciente', 'id_institucion', 'codigo_historial', 'fecha_apertura', 'estado',
   'fecha_cierre', 'motivo_cierre', 'observaciones',
 ];
-const historialAContrato = (h) => ({
+const historialAContrato = (h) => aTextoInstitucion({
   id_historial: String(h._id),
   ...Object.fromEntries(CAMPOS_HISTORIAL.map((c) => [c, convertir(h[c] ?? null)])),
 });
@@ -223,7 +223,7 @@ function crearRepositorios(cn) {
       await col('historiales').insertOne({
         _id: idHistorial,
         id_paciente: idPaciente,
-        id_institucion: String(datos.id_institucion),
+        id_institucion: comoIdInstitucion(datos.id_institucion),
         codigo_historial: datos.codigo_historial,
         fecha_apertura: datos.fecha_registro,
         estado: 'Activo',
@@ -368,7 +368,7 @@ function crearRepositorios(cn) {
     }),
   };
 
-  const citaAContrato = (c) => aContrato(c, 'id_cita');
+  const citaAContrato = (c) => aTextoInstitucion(aContrato(c, 'id_cita'));
 
   const citas = {
     crear: (datos, actor) => cn.transaccion(async (sesion) => {
@@ -383,7 +383,7 @@ function crearRepositorios(cn) {
       const cita = {
         _id: nuevoOid(),
         id_paciente: idPaciente,
-        id_institucion: String(datos.id_institucion),
+        id_institucion: comoIdInstitucion(datos.id_institucion),
         id_usuario_profesional: idProfesional,
         fecha_hora: datos.fecha_hora,
         motivo_consulta: datos.motivo_consulta ?? null,

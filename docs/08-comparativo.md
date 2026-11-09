@@ -22,7 +22,7 @@ Comparativo de los cuatro motores: por qué se asignó cada uno a su institució
 | Crecimiento, vacunas, resultados | Fuera de alcance | Resultados en colección propia | Subcolecciones del paciente |
 | ID | Entero autoincremental | `ObjectId` | Cadena de 20 caracteres |
 
-Hacia el frontend todo es igual: el DTO convierte cada estructura al mismo JSON y los IDs son siempre strings opacos.
+Hacia el frontend todo es igual: el DTO convierte cada estructura al mismo JSON y los IDs son siempre strings opacos. La excepción interna es `id_institucion`: es un entero del catálogo (1 a 4) que se guarda como número en todos los motores, igual que en el token y en la fábrica, y se expone como texto.
 
 ## 3. Consistencia
 

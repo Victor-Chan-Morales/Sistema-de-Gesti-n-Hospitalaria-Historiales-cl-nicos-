@@ -21,7 +21,7 @@ const {
 } = require('../../../domain/errores');
 const { hoy } = require('../../../domain/fechas');
 const {
-  COLUMNAS_PACIENTE, elegir, comoTexto, contiene, registroAuditoria, esProfesionalActivo,
+  COLUMNAS_PACIENTE, elegir, comoTexto, comoIdInstitucion, aTextoInstitucion, contiene, registroAuditoria, esProfesionalActivo,
   porCampo, porCampoDesc,
 } = require('../nosql-comun/utilidades');
 const { claveUnica } = require('./conexion');
@@ -68,7 +68,7 @@ const CAMPOS_HISTORIAL = [
   'id_historial', 'id_institucion', 'codigo_historial', 'fecha_apertura', 'estado',
   'fecha_cierre', 'motivo_cierre', 'observaciones',
 ];
-const historialAContrato = (idPaciente, historial) => ({
+const historialAContrato = (idPaciente, historial) => aTextoInstitucion({
   id_historial: historial.id_historial,
   id_paciente: idPaciente,
   ...Object.fromEntries(CAMPOS_HISTORIAL.slice(1).map((c) => [c, historial[c] ?? null])),
@@ -185,7 +185,7 @@ function crearRepositorios(cn) {
         representantes: representantes(datos.representantes),
         historial: {
           id_historial: nuevoId(),
-          id_institucion: String(datos.id_institucion),
+          id_institucion: comoIdInstitucion(datos.id_institucion),
           codigo_historial: datos.codigo_historial,
           fecha_apertura: datos.fecha_registro,
           estado: 'Activo',
@@ -352,7 +352,7 @@ function crearRepositorios(cn) {
 
   // --- citas ---
 
-  const citaAContrato = (snap) => aContrato(snap.id, 'id_cita', snap.data());
+  const citaAContrato = (snap) => aTextoInstitucion(aContrato(snap.id, 'id_cita', snap.data()));
   const claveCita = (c) => `${c.id_paciente}|${c.id_usuario_profesional}|${c.fecha_hora}`;
 
   const citas = {
@@ -362,7 +362,7 @@ function crearRepositorios(cn) {
 
       const cita = {
         id_paciente: String(datos.id_paciente),
-        id_institucion: String(datos.id_institucion),
+        id_institucion: comoIdInstitucion(datos.id_institucion),
         id_usuario_profesional: String(datos.id_usuario_profesional),
         fecha_hora: datos.fecha_hora,
         motivo_consulta: datos.motivo_consulta ?? null,

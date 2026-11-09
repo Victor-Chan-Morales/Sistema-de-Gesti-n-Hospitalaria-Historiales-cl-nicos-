@@ -21,6 +21,13 @@ function elegir(origen, campos) {
 // los valores que se comparan por igualdad se fuerzan a texto.
 const comoTexto = (valor) => (valor === undefined || valor === null ? valor : String(valor));
 
+// El ID de institución es un entero del catálogo (1-4). Se guarda como número, igual que en el
+// token y en la fábrica. Hacia el cliente sale como texto, como el resto de IDs del contrato.
+const comoIdInstitucion = (valor) => (valor === undefined || valor === null ? valor : Number(valor));
+const aTextoInstitucion = (entidad) => (entidad && entidad.id_institucion != null
+  ? { ...entidad, id_institucion: String(entidad.id_institucion) }
+  : entidad);
+
 const escaparRegex = (texto) => String(texto).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const contiene = (valor, texto) => String(valor ?? '').toLowerCase().includes(String(texto).toLowerCase());
@@ -65,6 +72,8 @@ module.exports = {
   COLUMNAS_PACIENTE,
   elegir,
   comoTexto,
+  comoIdInstitucion,
+  aTextoInstitucion,
   escaparRegex,
   contiene,
   registroAuditoria,
