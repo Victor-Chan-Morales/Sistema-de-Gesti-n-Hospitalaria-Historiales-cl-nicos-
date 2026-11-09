@@ -356,6 +356,11 @@ function crearRepositorios(cn) {
           fecha_cierre: fecha,
           motivo_cierre: motivo,
         }, 'id_paciente', id);
+        // Regla: al archivar, las citas que siguen programadas se cancelan.
+        await cx.ejecutar(
+          "UPDATE Cita SET estado = 'Cancelada' WHERE id_paciente = ? AND estado = 'Programada'",
+          [id],
+        );
         await auditar(cx, actor, 'ARCHIVAR', 'Paciente', id);
         return cargarPaciente(cx, id);
       });
@@ -568,6 +573,13 @@ function crearRepositorios(cn) {
       return cn.transaccion(async (cx) => {
         const filas = await cx.actualizar('Consulta', { estado }, 'id_consulta', id);
         if (filas === 0) throw new NoEncontrado('La consulta no existe.');
+        // Regla: anular una consulta cancela la cita que la originó, si figuraba como atendida.
+        if (estado === 'Anulada') {
+          await cx.ejecutar(
+            "UPDATE Cita SET estado = 'Cancelada' WHERE estado = 'Atendida' AND id_cita = (SELECT id_cita FROM Consulta WHERE id_consulta = ?)",
+            [id],
+          );
+        }
         await auditar(cx, actor, `ESTADO_${estado.toUpperCase()}`, 'Consulta', id);
         return cargarConsulta(cx, id);
       });

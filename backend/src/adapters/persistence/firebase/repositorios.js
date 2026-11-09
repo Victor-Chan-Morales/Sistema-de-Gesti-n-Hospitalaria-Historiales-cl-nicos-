@@ -290,6 +290,9 @@ function crearRepositorios(cn) {
       return cn.transaccion(async (tx) => {
         const snap = await exigirPaciente(tx, id);
         const actual = snap.data();
+        // Las lecturas van antes de las escrituras: citas que siguen programadas del paciente.
+        const citasProgramadas = (await tx.get(col('citas')
+          .where('id_paciente', '==', String(id)).where('estado', '==', 'Programada'))).docs;
         // Paciente e historial son el mismo documento: se cambian juntos.
         tx.update(refPaciente(id), {
           estado,
@@ -298,6 +301,11 @@ function crearRepositorios(cn) {
           'historial.fecha_cierre': fecha,
           'historial.motivo_cierre': motivo,
         });
+        // Regla: al archivar, las citas programadas pasan a Cancelada y liberan su clave de unicidad.
+        for (const cita of citasProgramadas) {
+          tx.update(cita.ref, { estado: 'Cancelada' });
+          tx.delete(refUnico('cita', claveCita(cita.data())));
+        }
         auditar(tx, actor, 'ARCHIVAR', 'Paciente', id);
         return pacienteAContrato({
           id,
@@ -628,7 +636,15 @@ function crearRepositorios(cn) {
     async cambiarEstado(id, estado, actor) {
       return cn.transaccion(async (tx) => {
         const snap = await exigirConsulta(tx, id);
+        // Regla: anular una consulta cancela la cita que la originó, si figuraba como atendida.
+        const idCita = estado === 'Anulada' ? snap.data().id_cita : null;
+        const citaSnap = idCita && esIdValido(String(idCita))
+          ? await tx.get(col('citas').doc(String(idCita)))
+          : null;
         tx.update(snap.ref, { estado });
+        if (citaSnap?.exists && citaSnap.data().estado === 'Atendida') {
+          tx.update(citaSnap.ref, { estado: 'Cancelada' });
+        }
         auditar(tx, actor, `ESTADO_${estado.toUpperCase()}`, 'Consulta', id);
         return aContrato(id, 'id_consulta', { ...snap.data(), estado });
       });

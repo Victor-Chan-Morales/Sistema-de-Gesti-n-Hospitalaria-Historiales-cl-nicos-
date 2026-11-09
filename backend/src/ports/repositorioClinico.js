@@ -43,7 +43,7 @@ const CONTRATO = Object.freeze({
     // (idPaciente, cambios, actor) => Paciente. Las colecciones presentes se reemplazan.
     actualizar: 1,
     // (idPaciente, { estado, motivo, fecha }, actor) => Paciente.
-    // Actualiza paciente e historial como una unidad.
+    // Actualiza paciente e historial como una unidad, y cancela sus citas programadas.
     archivar: 1,
   },
   historiales: {
@@ -79,7 +79,8 @@ const CONTRATO = Object.freeze({
     registrarAtencion: 1,
     // (idConsulta) => Consulta con id_paciente y detalle anidado | null
     obtener: 1,
-    // (idConsulta, estado, actor) => Consulta
+    // (idConsulta, estado, actor) => Consulta. Si pasa a 'Anulada', cancela la cita que la originó
+    // cuando figuraba como 'Atendida'.
     cambiarEstado: 1,
     // (idConsulta, datos, actor) => Consulta
     agregarDiagnostico: 1,

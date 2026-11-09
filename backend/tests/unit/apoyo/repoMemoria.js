@@ -159,6 +159,9 @@ function crearRepoMemoria() {
         const paciente = exigir(bd.pacientes, id, 'El paciente no existe.');
         Object.assign(paciente, { estado, motivo_baja: motivo });
         Object.assign(bd.historiales.get(String(id)).historial, { estado: 'Archivado', fecha_cierre: fecha, motivo_cierre: motivo });
+        for (const c of bd.citas.values()) {
+          if (c.id_paciente === String(id) && c.estado === 'Programada') c.estado = 'Cancelada';
+        }
         auditar(actor, 'ARCHIVAR', 'Paciente', id);
         return vista(paciente);
       },
@@ -283,6 +286,8 @@ function crearRepoMemoria() {
       async cambiarEstado(id, estado, actor) {
         const consulta = exigir(bd.consultas, id, 'La consulta no existe.');
         consulta.estado = estado;
+        const cita = consulta.id_cita ? bd.citas.get(String(consulta.id_cita)) : null;
+        if (estado === 'Anulada' && cita?.estado === 'Atendida') cita.estado = 'Cancelada';
         auditar(actor, `ESTADO_${estado.toUpperCase()}`, 'Consulta', id);
         return copia(consulta);
       },

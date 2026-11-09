@@ -295,6 +295,12 @@ function crearRepositorios(cn) {
           { $set: { estado: 'Archivado', fecha_cierre: fecha, motivo_cierre: motivo } },
           { session: sesion },
         );
+        // Regla: al archivar, las citas que siguen programadas se cancelan.
+        await col('citas').updateMany(
+          { id_paciente: aOid(id), estado: 'Programada' },
+          { $set: { estado: 'Cancelada' } },
+          { session: sesion },
+        );
         await auditar(sesion, actor, 'ARCHIVAR', 'Paciente', id);
         return pacienteAContrato(paciente);
       });
@@ -580,6 +586,14 @@ function crearRepositorios(cn) {
           { _id: aOid(id) }, { $set: { estado } }, { returnDocument: 'after', session: sesion },
         );
         if (!consulta) throw new NoEncontrado('La consulta no existe.');
+        // Regla: anular una consulta cancela la cita que la originó, si figuraba como atendida.
+        if (estado === 'Anulada' && consulta.id_cita) {
+          await col('citas').updateOne(
+            { _id: consulta.id_cita, estado: 'Atendida' },
+            { $set: { estado: 'Cancelada' } },
+            { session: sesion },
+          );
+        }
         await auditar(sesion, actor, `ESTADO_${estado.toUpperCase()}`, 'Consulta', id);
         return consultaAContrato(consulta);
       });

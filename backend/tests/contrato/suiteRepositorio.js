@@ -191,6 +191,16 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
       assert.equal(historial.motivo_cierre, 'Traslado');
     });
 
+    it('pacientes: archivar cancela sus citas que seguían programadas', async () => {
+      const horaBase = horaUnica();
+      const { id_paciente: id } = await repos.pacientes.crear(nuevoPaciente(), actor);
+      const cita = await repos.citas.crear({
+        id_paciente: id, id_institucion: idInstitucion, id_usuario_profesional: profesional.id_usuario, fecha_hora: horaBase,
+      }, actor);
+      await repos.pacientes.archivar(id, { estado: 'Archivado', motivo: 'Traslado', fecha: '2026-01-15' }, actor);
+      assert.equal((await repos.citas.obtener(cita.id_cita)).estado, 'Cancelada');
+    });
+
     it('historiales: agrega alergias y antecedentes, sin repetir alergia', async () => {
       const { id_paciente: id } = await repos.pacientes.crear(nuevoPaciente(), actor);
       const datos = {
@@ -473,6 +483,18 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
       assert.equal(resultados.filter((r) => r.status === 'fulfilled').length, 1);
       const rechazo = resultados.find((r) => r.status === 'rejected');
       assert.ok(rechazo.reason instanceof errores.ConflictoHorario, String(rechazo.reason));
+    });
+
+    it('consultas: anular una consulta cancela la cita que la originó', async () => {
+      const horaBase = horaUnica();
+      const { id_paciente: id } = await repos.pacientes.crear(nuevoPaciente(), actor);
+      const cita = await repos.citas.crear({
+        id_paciente: id, id_institucion: idInstitucion, id_usuario_profesional: profesional.id_usuario, fecha_hora: horaBase,
+      }, actor);
+      const consulta = await repos.consultas.registrarAtencion(nuevaAtencion(id, { id_cita: cita.id_cita }), actor, ventana());
+      assert.equal((await repos.citas.obtener(cita.id_cita)).estado, 'Atendida');
+      await repos.consultas.cambiarEstado(consulta.id_consulta, 'Anulada', actor);
+      assert.equal((await repos.citas.obtener(cita.id_cita)).estado, 'Cancelada');
     });
 
     it('consultas: agrega detalle y cambia estado', async () => {
