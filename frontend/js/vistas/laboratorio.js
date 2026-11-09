@@ -115,7 +115,11 @@ async function vistaLaboratorio(contenedor, params) {
     estado.tipoVista = 'detalle';
     const zona = contenedor.querySelector('#zona-laboratorio');
     const nombres = await nombresDePacientes();
-    const transiciones = TRANSICIONES_ORDEN[orden.estado] ?? [];
+    // La orden pasa sola a "Finalizada" al registrar el último resultado, y el servidor no
+    // permite finalizarla a mano mientras falten resultados: el botón solo se ofrece si no falta ninguno.
+    const resultadosCompletos = (orden.resultados ?? []).length >= (orden.examenes ?? []).length;
+    const transiciones = (TRANSICIONES_ORDEN[orden.estado] ?? [])
+      .filter((destino) => destino !== 'Finalizada' || resultadosCompletos);
 
     const resultadoDe = (idTipo) => (orden.resultados ?? []).find((r) => String(r.id_tipo_examen) === String(idTipo));
 
@@ -158,7 +162,7 @@ async function vistaLaboratorio(contenedor, params) {
               </div>
               ${resultado
                 ? `<p class="text-sm text-gray-700 resultado-existe">Resultado del ${fechaLarga(resultado.fecha_resultado)}</p>`
-                : puedeRegistrar && orden.estado !== 'Cancelada'
+                : puedeRegistrar && ['Pendiente', 'En proceso'].includes(orden.estado)
                   ? `<button type="button" data-registrar="${esc(examen.id_tipo_examen)}" class="btn btn-primario btn-chico">Registrar resultado</button>`
                   : '<span class="text-sm text-amber-800">Sin resultado</span>'}
             </div>

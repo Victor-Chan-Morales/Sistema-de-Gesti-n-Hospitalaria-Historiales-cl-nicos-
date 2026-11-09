@@ -53,10 +53,12 @@ async function obtenerOrden(repos, idOrden) {
 
 async function listarOrdenes(repos, filtros = {}) {
   const texto = (v) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
-  return exigirServicio(repos).listarOrdenes({
+  const ordenes = await exigirServicio(repos).listarOrdenes({
     id_paciente: texto(filtros.id_paciente),
     estado: texto(filtros.estado),
   });
+  // El orden de la cola es regla del laboratorio, igual en MongoDB y en cualquier otro motor.
+  return laboratorio.ordenarPorUrgencia(ordenes);
 }
 
 async function cambiarEstadoOrden(repos, actor, idOrden, datos) {
@@ -64,6 +66,7 @@ async function cambiarEstadoOrden(repos, actor, idOrden, datos) {
   const { estado } = validar(datos, esquemas.estadoOrden);
   const orden = await exigirOrden(examenes, idOrden);
   laboratorio.exigirTransicionOrden(orden.estado, estado);
+  if (estado === 'Finalizada') laboratorio.exigirResultadosCompletos(orden);
   return examenes.cambiarEstadoOrden(idOrden, estado, actor);
 }
 
