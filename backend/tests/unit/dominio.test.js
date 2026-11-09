@@ -58,6 +58,14 @@ describe('validación', () => {
     }, esquemas.nuevaConsulta), DatosInvalidos);
   });
 
+  it('la talla de la consulta va en centímetros: un adulto de 170 cm es válido', () => {
+    const limpio = validar({ id_paciente: '1', signos_vitales: { talla: 170 } }, esquemas.nuevaConsulta);
+    assert.equal(limpio.signos_vitales.talla, 170);
+    assert.throws(() => validar({
+      id_paciente: '1', signos_vitales: { talla: 251 },
+    }, esquemas.nuevaConsulta), DatosInvalidos);
+  });
+
   it('valida elementos anidados y señala su ruta', () => {
     assert.throws(
       () => validar({ ...base, telefonos: [{ numero: '1', tipo: 'Fax' }] }, esquemas.paciente),

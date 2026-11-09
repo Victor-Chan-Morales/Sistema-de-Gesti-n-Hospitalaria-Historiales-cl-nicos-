@@ -251,7 +251,7 @@ async function escenariosLaboratorio(adaptador, destino) {
       examen_fisico: 'Faringe eritematosa sin exudado',
       notas_clinicas: 'Cuadro viral probable',
       estado: 'Finalizada',
-      signos_vitales: { presion_arterial: '118/76', temperatura: 38.2, frecuencia_cardiaca: 92, peso: 62.5, talla: 1.65, saturacion_oxigeno: 98 },
+      signos_vitales: { presion_arterial: '118/76', temperatura: 38.2, frecuencia_cardiaca: 92, peso: 62.5, talla: 165, saturacion_oxigeno: 98 },
       diagnosticos: [{ id_catalogo_diag: idDiagnostico('J06.9'), tipo: 'Definitivo' }],
       receta: {
         indicaciones_generales: 'Reposo y líquidos abundantes',
@@ -333,7 +333,7 @@ async function escenariosPediatria(adaptador, destino) {
       examen_fisico: 'Garganta eritematosa',
       notas_clinicas: 'Cuadro viral; hidratación y control en 48 horas',
       estado: 'Finalizada',
-      signos_vitales: { temperatura: 38.5, frecuencia_cardiaca: 100, peso: 26.5, talla: 1.28 },
+      signos_vitales: { temperatura: 38.5, frecuencia_cardiaca: 100, peso: 26.5, talla: 128 },
       diagnosticos: [{ id_catalogo_diag: idDiagnostico('J06.9'), tipo: 'Definitivo' }],
       receta: {
         detalles: [{ id_medicamento: idMedicamento('Ibuprofeno'), dosis: '200 mg', frecuencia: 'Cada 8 horas si hay fiebre', duracion: '3 días' }],

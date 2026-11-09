@@ -1073,7 +1073,7 @@ components:
         frecuencia_cardiaca: { type: integer, nullable: true }
         frecuencia_respiratoria: { type: integer, nullable: true }
         peso: { type: number, nullable: true }
-        talla: { type: number, nullable: true }
+        talla: { type: number, nullable: true, description: cm }
         saturacion_oxigeno: { type: integer, nullable: true }
     ConsultaEntrada:
       type: object

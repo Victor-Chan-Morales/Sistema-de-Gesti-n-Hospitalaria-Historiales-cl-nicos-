@@ -132,7 +132,7 @@ CREATE TABLE Correo_Representante (
 
 CREATE TABLE Historial_Clinico (
     id_historial INT AUTO_INCREMENT PRIMARY KEY,
-    id_paciente INT,
+    id_paciente INT UNIQUE,
     id_institucion INT,
     codigo_historial VARCHAR(50) UNIQUE,
     fecha_apertura DATE NOT NULL,
@@ -212,7 +212,7 @@ CREATE TABLE Signos_Vitales (
     frecuencia_cardiaca INT,
     frecuencia_respiratoria INT,
     peso DECIMAL(5,2),
-    talla DECIMAL(4,2),
+    talla DECIMAL(5,2),
     saturacion_oxigeno INT,
     fecha_registro DATETIME NOT NULL,
     FOREIGN KEY (id_consulta) REFERENCES Consulta(id_consulta)
@@ -303,6 +303,7 @@ CREATE TABLE Pieza_Dental (
     numero_pieza INT NOT NULL,
     estado ENUM('Sana', 'Caries', 'Ausente', 'Restaurada', 'Fracturada'),
     observaciones TEXT,
+    UNIQUE (id_odontograma, numero_pieza),
     FOREIGN KEY (id_odontograma) REFERENCES Odontograma(id_odontograma)
 );
 

@@ -258,7 +258,7 @@ function ejecutarSuiteContrato(nombre, { crearRepos, idInstitucion, usuarioAdmin
       const consulta = await repos.consultas.registrarAtencion(nuevaAtencion(id, {
         id_cita: cita.id_cita,
         signos_vitales: {
-          presion_arterial: '120/80', temperatura: 37.5, frecuencia_cardiaca: 70, peso: 65.25, talla: 1.7, fecha_registro: horaBase,
+          presion_arterial: '120/80', temperatura: 37.5, frecuencia_cardiaca: 70, peso: 65.25, talla: 170, fecha_registro: horaBase,
         },
         diagnosticos: [{ id_catalogo_diag: diagnosticos[0].id_catalogo_diag, tipo: 'Definitivo', fecha_registro: '2026-01-20' }],
         tratamientos: [{ descripcion: 'Reposo', fecha_inicio: '2026-01-20', estado: 'Activo' }],
