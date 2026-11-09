@@ -218,3 +218,6 @@ input::placeholder, textarea::placeholder { color: #97A6A1; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* El atributo hidden debe ganar a las clases que fijan display (.filtros, grid, flex). */
+[hidden] { display: none !important; }

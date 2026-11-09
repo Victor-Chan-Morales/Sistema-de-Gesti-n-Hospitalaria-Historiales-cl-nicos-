@@ -32,6 +32,7 @@ async function agregarControl(repos, actor, idPaciente, datos) {
 
   const control = { fecha_control: hoy(), ...limpio };
   pediatria.exigirFechaNoFutura(control.fecha_control, hoy(), 'La fecha del control');
+  pediatria.exigirAlgunaMedida(control);
   return seguimiento.agregarControl(idPaciente, control, actor);
 }
 

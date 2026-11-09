@@ -110,6 +110,39 @@ describe('laboratorio: casos de uso', () => {
     await assert.rejects(laboratorio.cambiarEstadoOrden(repos, actor, '1', { estado: 'Inventado' }), DatosInvalidos);
   });
 
+  it('una orden solo se finaliza a mano si ya tiene todos sus resultados', async () => {
+    const examenes = crearExamenes({
+      1: { estado: 'En proceso', examenes: [{ id_tipo_examen: '11' }, { id_tipo_examen: '12' }], resultados: [{ id_tipo_examen: '11' }] },
+      2: { estado: 'En proceso', examenes: [{ id_tipo_examen: '11' }], resultados: [{ id_tipo_examen: '11' }] },
+    });
+    const repos = { examenes };
+    await assert.rejects(laboratorio.cambiarEstadoOrden(repos, actor, '1', { estado: 'Finalizada' }), ReglaNegocio);
+    assert.equal((await laboratorio.cambiarEstadoOrden(repos, actor, '2', { estado: 'Finalizada' })).estado, 'Finalizada');
+    // Cancelar sigue permitido aunque falten resultados.
+    assert.equal((await laboratorio.cambiarEstadoOrden(repos, actor, '1', { estado: 'Cancelada' })).estado, 'Cancelada');
+  });
+
+  it('la lista pone primero las órdenes abiertas más urgentes y al final las cerradas', async () => {
+    const { ordenarPorUrgencia } = require('../../src/domain/laboratorio');
+    const o = (id, prioridad, estado, fecha) => ({ id, prioridad, estado, fecha_orden: fecha });
+    const lista = [
+      o('normal-vieja', 'Normal', 'Pendiente', '2026-11-01T08:00:00'),
+      o('entregada-urgente', 'Urgente', 'Entregada', '2026-11-08T09:00:00'),
+      o('urgente', 'Urgente', 'En proceso', '2026-11-05T08:00:00'),
+      o('emergencia-nueva', 'Emergencia', 'Pendiente', '2026-11-08T10:00:00'),
+      o('emergencia-vieja', 'Emergencia', 'Pendiente', '2026-11-07T10:00:00'),
+      o('cancelada-vieja', 'Normal', 'Cancelada', '2026-10-01T08:00:00'),
+    ];
+    assert.deepEqual(ordenarPorUrgencia(lista).map((x) => x.id), [
+      'emergencia-vieja', 'emergencia-nueva', 'urgente', 'normal-vieja', 'entregada-urgente', 'cancelada-vieja',
+    ]);
+    assert.equal(lista[0].id, 'normal-vieja', 'no modifica la lista recibida');
+
+    const examenes = { ...crearExamenes(), listarOrdenes: async () => lista };
+    const ordenadas = await laboratorio.listarOrdenes({ examenes });
+    assert.equal(ordenadas[0].id, 'emergencia-vieja');
+  });
+
   it('los filtros de la lista son texto o se ignoran', async () => {
     const examenes = crearExamenes();
     await laboratorio.listarOrdenes({ examenes }, { id_paciente: ' 5 ', estado: { $ne: null } });
@@ -157,6 +190,18 @@ describe('pediatría: casos de uso', () => {
     );
     assert.equal(control.fecha_control, hoy());
     assert.equal(control.peso, 14.2);
+  });
+
+  it('rechaza un control sin ninguna medida y acepta uno con cualquiera de ellas', async () => {
+    const seguimiento = crearSeguimiento();
+    const menor = reposConPaciente({ seguimiento }, { estado: 'Activo', fecha_nacimiento: anioAtras(3) });
+    await assert.rejects(pediatria.agregarControl(menor, actorPediatra, '5', {}), ReglaNegocio);
+    await assert.rejects(pediatria.agregarControl(menor, actorPediatra, '5', { observaciones: 'solo una nota' }), ReglaNegocio);
+    assert.equal(seguimiento.llamadas.length, 0);
+    for (const medida of [{ peso: 14 }, { talla: 95 }, { perimetro_cefalico: 47 }, { indice_masa_corporal: 15.5 }]) {
+      await pediatria.agregarControl(menor, actorPediatra, '5', medida);
+    }
+    assert.equal(seguimiento.llamadas.length, 4);
   });
 
   it('rechaza controles y vacunas de un adulto, de un paciente archivado y con fechas imposibles', async () => {
