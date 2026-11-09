@@ -58,7 +58,7 @@ de forma coherente.
 
 | # | Decisión | Por qué hizo falta | Alternativa descartada |
 |---|---|---|---|
-| D1 | Una orden solo cambia de estado en un orden lógico (Pendiente → En proceso → Finalizada → Entregada; se puede Cancelar antes de finalizar), y no admite resultados si está finalizada, entregada o cancelada | El documento da los estados pero no el flujo. Sin esto se podrían cargar resultados a una orden cancelada, contra las reglas 15 y 16 | Dejar cualquier cambio de estado, lo que permite datos incoherentes |
+| D1 | Una orden solo cambia de estado en un orden lógico (Pendiente → En proceso → Finalizada → Entregada; se puede Cancelar antes de finalizar, siempre que no tenga resultados registrados), y no admite resultados si está finalizada, entregada o cancelada | El documento da los estados pero no el flujo. Sin esto se podrían cargar resultados a una orden cancelada, contra las reglas 15 y 16 | Dejar cualquier cambio de estado, lo que permite datos incoherentes |
 | D2 | El seguimiento pediátrico solo acepta pacientes menores de 18 años y activos | El documento habla de "niños y adolescentes" y la regla 12 de "menores de edad". Se tomó 18 como mayoría de edad. Un paciente archivado no recibe atención nueva (consideración 5 de la propuesta) | No validar la edad |
 | D3 | Si se llaman las rutas de laboratorio o pediatría desde otra institución, responden 422 con un mensaje claro | Las rutas están montadas para todas las instituciones, y sin esto se tendría un error genérico | Montar las rutas solo en la institución correspondiente |
 | D4 | Los servicios propios usan puertos y rutas aparte (`/api/laboratorio`, `/api/pediatria`) y no se agregan al puerto común | El puerto común es el contrato único que implementan los cuatro motores. Meter funciones de una sola institución obligaría a los adaptadores relacionales a implementarlas. Lo decidió el equipo al elegir "puertos y rutas propios" | Ampliar el puerto común |
@@ -72,12 +72,12 @@ de forma coherente.
 
 ## 5. Pendientes y riesgos
 
-- **P1. Resuelto.** Las pruebas de integración pasan contra servicios reales: 26 contra MongoDB Atlas y
-  27 contra un proyecto de Firestore, incluidas las de envíos simultáneos y atomicidad.
+- **P1. Resuelto.** Las pruebas de integración pasan contra las cuatro bases levantadas con Docker (136 en
+  total), incluidas las de envíos simultáneos, choques de horario y atomicidad.
 - **P2. Resuelto.** `equivalencia-motores.test.js` corre el mismo flujo en cada motor (usando la fábrica,
   como la aplicación) y compara el JSON. Se ejecutó con `EQUIVALENCIA_EXIGIR_TODOS=1` sobre PostgreSQL, MySQL,
   MongoDB y Firebase (emulador de Firestore) levantados con Docker, y los cuatro devuelven lo mismo. Las
-  pruebas de contrato de PostgreSQL y MySQL también pasan (40 de 40).
+  pruebas de contrato de PostgreSQL y MySQL también pasan.
 - **P3. Parámetros de examen.** La clasificación de la información menciona "Parámetro de examen"
   (parámetros y rangos de referencia por tipo de examen), pero no tiene atributos definidos en las entidades.
   Hoy el rango de referencia viaja dentro de cada valor del resultado. Si el equipo quiere un catálogo de

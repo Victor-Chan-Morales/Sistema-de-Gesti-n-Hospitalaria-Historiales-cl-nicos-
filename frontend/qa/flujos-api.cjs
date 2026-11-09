@@ -48,6 +48,21 @@ const fechaFutura = (dias) => {
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T09:30:00`;
 };
+// Hora de cita única por corrida: dos citas Programadas a la misma hora con el mismo profesional
+// chocan (409), así que volver a ejecutar el QA no puede reutilizar un horario ya ocupado.
+const horaUnicaFutura = (dias) => {
+  const desplazamiento = Math.floor(Number(SUFIJO) / 540) % 500;
+  const base = fechaFutura(dias + desplazamiento).slice(0, 10);
+  const hh = 8 + (Number(SUFIJO) % 9);
+  const mm = Math.floor(Number(SUFIJO) / 9) % 60;
+  return `${base}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
+};
+// Día pasado único por corrida: para datos que deben ser fechas ya ocurridas (una consulta con cita,
+// un control de crecimiento). Evita repetir un envío idéntico dentro de la ventana de doble envío
+// y evita chocar con consultas que la misma corrida registra con la hora actual.
+const diaPasadoUnico = (desplazamientoBase) => fechaFutura(-(desplazamientoBase + (Number(SUFIJO) % 300))).slice(0, 10);
+// Fecha local de hoy: el servidor compara con la fecha local, igual que la orden.
+const hoyLocal = () => fechaFutura(0).slice(0, 10);
 
 (async () => {
   // ---------- A. Archivos estáticos de la interfaz ----------
@@ -210,10 +225,11 @@ const fechaFutura = (dias) => {
   ok('lee consulta con detalle', detalle.estado === 200 && detalle.datos.diagnosticos.length === 1 && detalle.datos.signos_vitales?.temperatura === 38.5);
 
   const citaMedico = await pedir('POST', '/api/citas', { token: tSecretaria, cuerpo: {
-    id_paciente: idPacienteMedico, id_usuario_profesional: idProfesional, fecha_hora: fechaFutura(1), motivo_consulta: 'Consulta QA',
+    id_paciente: idPacienteMedico, id_usuario_profesional: idProfesional, fecha_hora: horaUnicaFutura(1), motivo_consulta: 'Consulta QA',
   } });
   const consultaConCita = await pedir('POST', '/api/consultas', { token: tMedico, cuerpo: {
     id_paciente: idPacienteMedico, id_cita: citaMedico.datos.id_cita, motivo_consulta: 'Consulta con cita',
+    fecha_hora: `${diaPasadoUnico(400)}T10:00:00`,
   } });
   ok('consulta desde la cita → cita Atendida', consultaConCita.estado === 201);
   const citaTrasConsulta = await pedir('GET', `/api/citas/${citaMedico.datos.id_cita}`, { token: tSecretaria });
@@ -286,7 +302,7 @@ const fechaFutura = (dias) => {
   ok('pasa a En proceso', enProceso.estado === 200 && enProceso.datos.estado === 'En proceso');
 
   const resultado = await pedir('POST', `/api/laboratorio/ordenes/${idOrden}/resultados`, { token: tLabo, cuerpo: {
-    id_tipo_examen: idsTipos[0], fecha_toma_muestra: '2026-11-01', resultado_general: 'Dentro de rangos',
+    id_tipo_examen: idsTipos[0], fecha_toma_muestra: hoyLocal(), resultado_general: 'Dentro de rangos',
     valores_detallados: [
       { parametro: 'Hemoglobina', valor: '13.5', unidad: 'g/dL', rango_referencia: '12-16' },
       { parametro: 'Glucosa', valor: '92', unidad: 'mg/dL', rango_referencia: '70-100' },
@@ -335,7 +351,7 @@ const fechaFutura = (dias) => {
   ok('control de un adulto → 422 con mensaje', controlAdulto.estado === 422 && Boolean(controlAdulto.datos.mensaje));
 
   const control = await pedir('POST', `/api/pediatria/pacientes/${idMenor}/controles`, { token: tPedia, cuerpo: {
-    fecha_control: '2026-11-05', peso: 26.2, talla: 128, perimetro_cefalico: 52,
+    fecha_control: diaPasadoUnico(400), peso: 26.2, talla: 128, perimetro_cefalico: 52,
   } });
   ok('registra control de crecimiento', control.estado === 201 && typeof control.datos.indice_masa_corporal === 'number');
   ok('IMC calculado por el backend', Math.abs(control.datos.indice_masa_corporal - 26.2 / (1.28 * 1.28)) < 0.01, `→ ${control.datos.indice_masa_corporal}`);
@@ -347,7 +363,7 @@ const fechaFutura = (dias) => {
   ok('dosis repetida (misma vacuna, dosis y fecha) → 409', vacunaDuplicada.estado === 409);
 
   const control2 = await pedir('POST', `/api/pediatria/pacientes/${idMenor}/controles`, { token: tPedia, cuerpo: {
-    fecha_control: '2026-10-01', peso: 25.5, talla: 126,
+    fecha_control: diaPasadoUnico(800), peso: 25.5, talla: 126,
   } });
   ok('segundo control', control2.estado === 201);
   const controlesLista = await pedir('GET', `/api/pediatria/pacientes/${idMenor}/controles`, { token: tPedia });

@@ -30,7 +30,7 @@ Proyecto final de Bases de Datos II (Universidad Rafael Landívar). Plataforma c
 **Funcionalidad, en los cuatro motores**
 - Pacientes: registro con historial clínico, búsqueda, edición y archivo por baja.
 - Historial: consulta completa, alergias y antecedentes.
-- Citas: programar, reprogramar y cancelar. Un paciente archivado o inactivo no recibe citas nuevas.
+- Citas: programar, reprogramar y cancelar. Un paciente archivado o inactivo no recibe citas nuevas, y al archivarlo sus citas programadas se cancelan.
 - Consultas: consulta, signos vitales, diagnósticos, tratamientos y receta se guardan como una unidad. También se pueden agregar datos a una consulta existente, finalizarla o anularla.
 - Catálogos de diagnósticos, medicamentos, alergias y profesionales.
 
@@ -51,12 +51,14 @@ Proyecto final de Bases de Datos II (Universidad Rafael Landívar). Plataforma c
 
 **Herramientas**
 - Docker Compose, datos de prueba repetibles y documentación interactiva de la API.
-- 124 pruebas unitarias y de arquitectura, y la suite de contrato de integración para los cuatro motores.
+- 148 pruebas unitarias y de arquitectura, y 136 de integración (contrato y equivalencia) contra los cuatro motores.
 
-### Lo que aún no está
+### Fuera de esta entrega
 
-- Hospitalización y odontograma: las tablas de hospital y clínica existen, pero aún no tienen endpoints.
-- Límite de intentos fallidos en el login. Además, un token sigue siendo válido hasta expirar, aunque se desactive al usuario.
+Decisiones de alcance, no pendientes:
+
+- **Hospitalización y odontograma:** las tablas existen en PostgreSQL y MySQL, pero no tienen endpoints ni pantallas en esta entrega.
+- **Límite de intentos fallidos en el login:** no se aplica. Un token sigue siendo válido hasta que expira, aunque se desactive al usuario ([`docs/07-seguridad.md`](docs/07-seguridad.md#limitaciones-conocidas)).
 
 ## Cómo levantarlo
 
@@ -179,7 +181,7 @@ cd backend && npm run seed && npm run seed:nosql
 npm start
 ```
 
-Abre <http://localhost:3000> e inicia sesión con los usuarios de la tabla de arriba. QA ejecutado: 92 verificaciones de flujo contra los cuatro motores (login de los 12 usuarios, pacientes, citas, consultas con advertencias, órdenes y resultados, controles y vacunas, permisos 403, reglas 422 y duplicados 409), caída de MySQL con el hospital operativo y `npm test` en verde (124 pruebas). El recorrido manual sugerido para la entrega está al final de [`docs/10-frontend.md`](docs/10-frontend.md).
+Abre <http://localhost:3000> e inicia sesión con los usuarios de la tabla de arriba. QA ejecutado: 94 verificaciones de flujo contra los cuatro motores (login de los 12 usuarios, pacientes, citas, consultas con advertencias, órdenes y resultados, controles y vacunas, permisos 403, reglas 422 y duplicados 409), caída de MySQL con el hospital operativo y `npm test` en verde (148 pruebas). El recorrido manual sugerido para la entrega está al final de [`docs/10-frontend.md`](docs/10-frontend.md).
 
 ## Documentación
 
@@ -192,5 +194,3 @@ Abre <http://localhost:3000> e inicia sesión con los usuarios de la tabla de ar
 - [Decisiones de arquitectura](docs/decisiones/)
 - [Guía de los motores NoSQL](docs/guia-integrante-b.md)
 - [Frontend y manual de pruebas](docs/10-frontend.md)
-
-Aún sin redactar: `docs/01-requisitos.md` y `docs/05-operaciones.md`.

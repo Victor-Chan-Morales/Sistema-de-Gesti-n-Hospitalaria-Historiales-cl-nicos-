@@ -13,7 +13,7 @@ Operaciones que la aplicación realiza sobre los datos, descritas en lenguaje se
 4. **Registrar un paciente nuevo** con sus datos personales, teléfonos, correos, contactos de emergencia y, si es menor de edad, al menos un representante legal. Al registrarlo se le abre su historial clínico (`POST /api/pacientes`).
 5. **Ver la ficha de un paciente** (`GET /api/pacientes/:id`).
 6. **Corregir los datos de un paciente** (`PATCH /api/pacientes/:id`).
-7. **Dar de baja a un paciente** por traslado, fallecimiento u otra causa. Se indica el motivo; el paciente queda archivado o inactivo y su historial se cierra, pero nada se borra. Un paciente dado de baja ya no recibe citas ni consultas nuevas (`POST /api/pacientes/:id/archivar`).
+7. **Dar de baja a un paciente** por traslado, fallecimiento u otra causa. Se indica el motivo; el paciente queda archivado o inactivo y su historial se cierra, pero nada se borra. Sus citas que seguían programadas se cancelan, y ya no recibe citas ni consultas nuevas (`POST /api/pacientes/:id/archivar`).
 
 ## Historial clínico
 
@@ -32,7 +32,7 @@ Operaciones que la aplicación realiza sobre los datos, descritas en lenguaje se
 14. **Registrar la atención de un paciente:** motivo, síntomas, examen físico, signos vitales, diagnósticos, tratamientos y receta. Se guarda todo junto: si algo falla, no se guarda nada. Si la consulta viene de una cita, la cita queda como atendida (`POST /api/consultas`).
 15. **Ver una consulta** con todo su detalle (`GET /api/consultas/:id`).
 16. **Agregar un diagnóstico, un tratamiento o una receta** a una consulta que ya existe. Al recetar, el sistema avisa si un medicamento parece relacionado con una alergia del paciente, pero la decisión es del profesional (`POST /api/consultas/:id/diagnosticos`, `/tratamientos`, `/recetas`).
-17. **Finalizar o anular una consulta.** Una consulta anulada queda en el historial, pero ya no admite datos nuevos (`PATCH /api/consultas/:id/estado`).
+17. **Finalizar o anular una consulta.** Una consulta anulada queda en el historial, pero ya no admite datos nuevos. Si la consulta venía de una cita atendida, la cita pasa a cancelada (`PATCH /api/consultas/:id/estado`).
 
 ## Catálogos
 

@@ -128,12 +128,12 @@ como verificación rápida antes de integrar.
   login de los 12 usuarios, pacientes, citas, historial, consultas con
   advertencias y doble envío, órdenes y resultados de laboratorio, controles y
   vacunas pediátricas, aislamiento entre instituciones y permisos por rol
-  (403), reglas de negocio (422) y 409 de duplicados. 92 verificaciones en
+  (403), reglas de negocio (422) y 409 de duplicados. 94 verificaciones en
   verde sobre las cuatro bases levantadas.
 - Caída de motor: con MySQL detenido, la clínica recibe 503 con mensaje
   amigable y el hospital responde 200. `/health/motores` marca
   `no_disponible` solo a la clínica.
-- Suite del equipo: `npm test` en verde (124 pruebas de unidad y arquitectura).
+- Suite del equipo: `npm test` en verde (148 pruebas de unidad y arquitectura).
 - Pruebas de humo del propio frontend (formatos de fecha, permisos, ApiError
   con 401/409/503) ejecutadas en Node simulando el entorno del navegador.
 

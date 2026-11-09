@@ -22,7 +22,7 @@ Leerlos con `pdftotext -layout <archivo> -` cuando haya dudas sobre los requisit
 
 ## Estado actual
 
-El núcleo hexagonal y los cuatro adaptadores están implementados: PostgreSQL y MySQL (Integrante A), MongoDB y Firebase (Integrante B). Si un motor no tuviera adaptador, `factory/repositoryFactory.js` lo resuelve con un stub que responde 503. El frontend (Integrante C) está pendiente. Las decisiones de modelado de MongoDB y Firebase están en `docs/04-modelo-documental.md` y `docs/08-comparativo.md`.
+El núcleo hexagonal y los cuatro adaptadores están implementados: PostgreSQL y MySQL (Integrante A), MongoDB y Firebase (Integrante B). Si un motor no tuviera adaptador, `factory/repositoryFactory.js` lo resuelve con un stub que responde 503. El frontend (Integrante C) está implementado: panel SPA por rol, con el QA en `frontend/qa/`. Las decisiones de modelado de MongoDB y Firebase están en `docs/04-modelo-documental.md` y `docs/08-comparativo.md`.
 
 ```bash
 cp .env.example .env                 # completar las variables
