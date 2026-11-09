@@ -8,7 +8,7 @@ require('../../src/config/env');
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { obtenerRepositorio, cerrarConexiones } = require('../../src/factory/repositoryFactory');
-const { flujoCompleto } = require('./apoyo/flujoEquivalencia');
+const { flujoCompleto, horasDeEjecucion } = require('./apoyo/flujoEquivalencia');
 
 const MOTORES = [
   { nombre: 'PostgreSQL', id_institucion: 1, usuario: 'medico.hospital' },
@@ -57,12 +57,13 @@ describe('equivalencia entre los cuatro motores', () => {
     t.diagnostic(`Comparando: ${disponibles.map((m) => m.nombre).join(', ')}`);
 
     const [referencia, ...otros] = disponibles;
-    const esperado = await flujoCompleto(referencia.repos, referencia.actor, 'A');
+    const horas = horasDeEjecucion();
+    const esperado = await flujoCompleto(referencia.repos, referencia.actor, 'A', horas);
     assert.equal(esperado.atencion.advertencias.length, 1);
     assert.equal(esperado.atencion.consulta.signos_vitales.temperatura, 36.75);
 
     for (const motor of otros) {
-      const obtenido = await flujoCompleto(motor.repos, motor.actor, 'A');
+      const obtenido = await flujoCompleto(motor.repos, motor.actor, 'A', horas);
       assert.deepEqual(obtenido, esperado, `${motor.nombre} responde distinto que ${referencia.nombre}`);
     }
   });

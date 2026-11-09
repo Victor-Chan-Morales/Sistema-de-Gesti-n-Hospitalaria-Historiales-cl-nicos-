@@ -44,6 +44,13 @@ function exigirResultadosCompletos(orden) {
   }
 }
 
+// Una orden con resultados ya registrados no se cancela: esos resultados quedarían sin orden.
+function exigirSinResultadosParaCancelar(orden) {
+  if ((orden.resultados ?? []).length > 0) {
+    throw new ReglaNegocio('No se puede cancelar una orden que ya tiene resultados registrados.');
+  }
+}
+
 // Solo una orden pendiente o en proceso admite resultados.
 function exigirOrdenAbierta(orden) {
   if (!['Pendiente', 'En proceso'].includes(orden.estado)) {
@@ -66,7 +73,30 @@ function exigirExamenDeLaOrden(orden, idTipoExamen) {
   }
 }
 
-function exigirFechasResultado({ fecha_toma_muestra: toma, fecha_resultado: resultado }) {
+// Un resultado debe decir algo: el valor general o al menos un valor detallado.
+function exigirResultadoConContenido(resultado) {
+  if (!resultado.resultado_general && !(resultado.valores_detallados?.length)) {
+    throw new ReglaNegocio('Un resultado debe incluir el resultado general o al menos un valor.');
+  }
+}
+
+// Fechas coherentes: ni futuras, ni la muestra antes de la orden, ni el resultado antes de la muestra.
+// fechaOrden llega como 'YYYY-MM-DDTHH:MM:SS'; solo importa el día.
+function exigirFechasResultado(
+  { fecha_toma_muestra: toma, fecha_resultado: resultado },
+  fechaOrden,
+  referencia,
+) {
+  const diaOrden = String(fechaOrden ?? '').slice(0, 10);
+  if (toma && toma > referencia) {
+    throw new ReglaNegocio('La toma de la muestra no puede estar en el futuro.');
+  }
+  if (resultado && resultado > referencia) {
+    throw new ReglaNegocio('La fecha del resultado no puede estar en el futuro.');
+  }
+  if (toma && diaOrden && toma < diaOrden) {
+    throw new ReglaNegocio('La muestra no puede tomarse antes de la fecha de la orden.');
+  }
   if (toma && resultado && resultado < toma) {
     throw new ReglaNegocio('La fecha del resultado no puede ser anterior a la toma de la muestra.');
   }
@@ -78,7 +108,9 @@ module.exports = {
   ordenarPorUrgencia,
   exigirTransicionOrden,
   exigirResultadosCompletos,
+  exigirSinResultadosParaCancelar,
   exigirOrdenAbierta,
+  exigirResultadoConContenido,
   exigirExamenesDeOrden,
   exigirExamenDeLaOrden,
   exigirFechasResultado,

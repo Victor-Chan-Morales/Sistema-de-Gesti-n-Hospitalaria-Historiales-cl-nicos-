@@ -17,7 +17,7 @@
 
 const { FieldValue } = require('firebase-admin/firestore');
 const {
-  NoEncontrado, ReglaNegocio, RegistroDuplicado, ConsultaDuplicada, DatosInvalidos,
+  NoEncontrado, ReglaNegocio, RegistroDuplicado, ConsultaDuplicada, DatosInvalidos, ConflictoHorario,
 } = require('../../../domain/errores');
 const { hoy } = require('../../../domain/fechas');
 const {
@@ -130,6 +130,44 @@ function crearRepositorios(cn) {
   }
 
   const refUnico = (tipo, valor) => col('indices_unicos').doc(claveUnica(tipo, valor));
+
+  // --- Agenda: choques de horario ---
+  // Escribir el paciente y el profesional hace que dos atenciones simultáneas de cualquiera de
+  // ellos choquen: Firestore reintenta a la perdedora, que entonces vuelve a leer los horarios.
+  // Regla de orden: todas las lecturas de la transacción van antes que las escrituras.
+  const MENSAJE_CITA_PROFESIONAL = 'El profesional ya tiene una cita programada a esa misma hora.';
+  const MENSAJE_CITA_PACIENTE = 'El paciente ya tiene una cita programada a esa misma hora.';
+  const MENSAJE_CONSULTA_PROFESIONAL = 'El profesional ya tiene una consulta registrada a esa misma hora.';
+  const MENSAJE_CONSULTA_PACIENTE = 'El paciente ya tiene una consulta registrada a esa misma hora.';
+
+  function bloquearAgenda(tx, idPaciente, idProfesional) {
+    tx.update(refPaciente(String(idPaciente)), { version: FieldValue.increment(1) });
+    tx.update(col('usuarios').doc(String(idProfesional)), { version: FieldValue.increment(1) });
+  }
+
+  // Regla: un profesional, o un paciente, no puede tener dos citas Programadas a la misma hora.
+  async function exigirHorarioCitaLibre(tx, { idCita, idPaciente, idProfesional, fechaHora }) {
+    const docs = (await tx.get(col('citas').where('fecha_hora', '==', fechaHora).where('estado', '==', 'Programada'))).docs;
+    const choque = docs
+      .filter((d) => d.id !== (idCita ? String(idCita) : null))
+      .map((d) => d.data())
+      .find((c) => String(c.id_usuario_profesional) === String(idProfesional) || String(c.id_paciente) === String(idPaciente));
+    if (!choque) return;
+    const delProfesional = String(choque.id_usuario_profesional) === String(idProfesional);
+    throw new ConflictoHorario(delProfesional ? MENSAJE_CITA_PROFESIONAL : MENSAJE_CITA_PACIENTE);
+  }
+
+  // Regla: un profesional, o un paciente, no puede tener dos consultas a la misma hora.
+  async function exigirHorarioConsultaLibre(tx, { idPaciente, idProfesional, fechaHora }) {
+    const consultas = (await tx.get(col('consultas').where('fecha_hora', '==', fechaHora))).docs.map((d) => d.data());
+    const choque = consultas
+      .filter((c) => c.estado !== 'Anulada')
+      .find((c) => String(c.id_usuario_profesional) === String(idProfesional) || String(c.id_paciente) === String(idPaciente));
+    if (!choque) return;
+    const delProfesional = String(choque.id_usuario_profesional) === String(idProfesional);
+    throw new ConflictoHorario(delProfesional ? MENSAJE_CONSULTA_PROFESIONAL : MENSAJE_CONSULTA_PACIENTE);
+  }
+
 
   async function exigirLibre(tx, refs, mensaje = 'Ya existe un registro con esos datos.') {
     if (refs.length === 0) return;
@@ -374,6 +412,10 @@ function crearRepositorios(cn) {
       // compiten por ella y Firestore reintenta al perdedor, que entonces la encuentra tomada.
       const marca = refUnico('cita', claveCita(cita));
       await exigirLibre(tx, [marca], 'El paciente ya tiene una cita idéntica programada.');
+      await exigirHorarioCitaLibre(tx, {
+        idCita: null, idPaciente: datos.id_paciente, idProfesional: datos.id_usuario_profesional, fechaHora: datos.fecha_hora,
+      });
+      bloquearAgenda(tx, datos.id_paciente, datos.id_usuario_profesional);
 
       const id = nuevoId();
       tx.create(col('citas').doc(id), cita);
@@ -427,6 +469,15 @@ function crearRepositorios(cn) {
         const cambiaMarca = marcaAnterior?.path !== marcaNueva?.path;
         if (cambiaMarca && marcaNueva) {
           await exigirLibre(tx, [marcaNueva], 'El paciente ya tiene una cita idéntica programada.');
+        }
+
+        const reubica = nueva.estado === 'Programada'
+          && (set.fecha_hora !== undefined || set.id_usuario_profesional !== undefined);
+        if (reubica) {
+          await exigirHorarioCitaLibre(tx, {
+            idCita: id, idPaciente: actual.id_paciente, idProfesional: nueva.id_usuario_profesional, fechaHora: nueva.fecha_hora,
+          });
+          bloquearAgenda(tx, actual.id_paciente, nueva.id_usuario_profesional);
         }
 
         if (Object.keys(set).length > 0) tx.update(ref, set);
@@ -515,6 +566,9 @@ function crearRepositorios(cn) {
           && c.notas_clinicas === (datos.notas_clinicas ?? null);
       });
       if (duplicada) throw new ConsultaDuplicada();
+      await exigirHorarioConsultaLibre(tx, {
+        idPaciente: datos.id_paciente, idProfesional: datos.id_usuario_profesional, fechaHora: datos.fecha_hora,
+      });
 
       const diagnosticos = await resolverDiagnosticos(tx, datos.diagnosticos);
       const receta = datos.receta ? await resolverReceta(tx, datos.receta) : null;
@@ -554,6 +608,7 @@ function crearRepositorios(cn) {
       // Escribir el paciente hace que dos consultas simultáneas choquen: Firestore reintenta
       // la perdedora y esta vuelve a evaluar el duplicado con la consulta ya confirmada.
       tx.update(pacienteSnap.ref, { version: FieldValue.increment(1) });
+      tx.update(col('usuarios').doc(String(datos.id_usuario_profesional)), { version: FieldValue.increment(1) });
       tx.create(col('consultas').doc(id), consulta);
       if (refCita) {
         tx.update(refCita, { estado: 'Atendida' });

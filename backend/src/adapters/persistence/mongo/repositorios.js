@@ -11,7 +11,7 @@
 
 const { ObjectId } = require('mongodb');
 const {
-  NoEncontrado, ReglaNegocio, RegistroDuplicado, ConsultaDuplicada, DatosInvalidos,
+  NoEncontrado, ReglaNegocio, RegistroDuplicado, ConsultaDuplicada, DatosInvalidos, ConflictoHorario,
 } = require('../../../domain/errores');
 const { ahora, hoy } = require('../../../domain/fechas');
 const { ROLES_PROFESIONALES } = require('../../../domain/roles');
@@ -372,6 +372,50 @@ function crearRepositorios(cn) {
     }),
   };
 
+  // --- Agenda: choques de horario ---
+  // Escribir sobre el mismo documento hace que dos transacciones simultáneas choquen: MongoDB
+  // reintenta a la perdedora y entonces ve la cita o consulta de la ganadora.
+  const MENSAJE_CITA_PROFESIONAL = 'El profesional ya tiene una cita programada a esa misma hora.';
+  const MENSAJE_CITA_PACIENTE = 'El paciente ya tiene una cita programada a esa misma hora.';
+  const MENSAJE_CONSULTA_PROFESIONAL = 'El profesional ya tiene una consulta registrada a esa misma hora.';
+  const MENSAJE_CONSULTA_PACIENTE = 'El paciente ya tiene una consulta registrada a esa misma hora.';
+
+  // Orden fijo de bloqueos: primero el historial del paciente, luego el profesional.
+  async function bloquearProfesional(sesion, idProfesional) {
+    if (idProfesional) await col('usuarios').updateOne({ _id: idProfesional }, { $inc: { version: 1 } }, { session: sesion });
+  }
+
+  async function bloquearAgenda(sesion, idPaciente, idProfesional) {
+    await col('historiales').updateOne({ id_paciente: idPaciente }, { $inc: { version: 1 } }, { session: sesion });
+    await bloquearProfesional(sesion, idProfesional);
+  }
+
+  // Regla: un profesional, o un paciente, no puede tener dos citas Programadas a la misma hora.
+  async function exigirHorarioCitaLibre(sesion, { idCita, idPaciente, idProfesional, fechaHora }) {
+    const filtro = {
+      estado: 'Programada',
+      fecha_hora: fechaHora,
+      $or: [{ id_usuario_profesional: idProfesional }, { id_paciente: idPaciente }],
+    };
+    if (idCita) filtro._id = { $ne: idCita };
+    const choque = await col('citas').findOne(filtro, { session: sesion, projection: { id_usuario_profesional: 1 } });
+    if (!choque) return;
+    const delProfesional = String(choque.id_usuario_profesional) === String(idProfesional);
+    throw new ConflictoHorario(delProfesional ? MENSAJE_CITA_PROFESIONAL : MENSAJE_CITA_PACIENTE);
+  }
+
+  // Regla: un profesional, o un paciente, no puede tener dos consultas a la misma hora.
+  async function exigirHorarioConsultaLibre(sesion, { idHistorial, idProfesional, fechaHora }) {
+    const choque = await col('consultas').findOne({
+      estado: { $ne: 'Anulada' },
+      fecha_hora: fechaHora,
+      $or: [{ id_usuario_profesional: idProfesional }, { id_historial: idHistorial }],
+    }, { session: sesion, projection: { id_usuario_profesional: 1 } });
+    if (!choque) return;
+    const delProfesional = String(choque.id_usuario_profesional) === String(idProfesional);
+    throw new ConflictoHorario(delProfesional ? MENSAJE_CONSULTA_PROFESIONAL : MENSAJE_CONSULTA_PACIENTE);
+  }
+
   const citaAContrato = (c) => aTextoInstitucion(aContrato(c, 'id_cita'));
 
   const citas = {
@@ -383,6 +427,12 @@ function crearRepositorios(cn) {
       const profesional = idProfesional && await col('usuarios').findOne({ _id: idProfesional }, { session: sesion, projection: { _id: 1 } });
       if (!paciente) throw new DatosInvalidos('id_paciente hace referencia a un registro inexistente.');
       if (!profesional) throw new DatosInvalidos('id_usuario_profesional hace referencia a un registro inexistente.');
+      await bloquearAgenda(sesion, idPaciente, idProfesional);
+      const identica = await col('citas').findOne({
+        estado: 'Programada', fecha_hora: datos.fecha_hora, id_paciente: idPaciente, id_usuario_profesional: idProfesional,
+      }, { session: sesion, projection: { _id: 1 } });
+      if (identica) throw new RegistroDuplicado('El paciente ya tiene una cita idéntica programada.');
+      await exigirHorarioCitaLibre(sesion, { idCita: null, idPaciente, idProfesional, fechaHora: datos.fecha_hora });
 
       const cita = {
         _id: nuevoOid(),
@@ -433,6 +483,18 @@ function crearRepositorios(cn) {
         if (cambios.id_usuario_profesional !== undefined) {
           set.id_usuario_profesional = idReferencia(cambios.id_usuario_profesional, 'id_usuario_profesional');
         }
+        const actual = await col('citas').findOne({ _id: aOid(id) }, { session: sesion });
+        if (!actual) throw new NoEncontrado('La cita no existe.');
+        const resultante = { ...actual, ...set };
+        if (resultante.estado === 'Programada' && (set.fecha_hora !== undefined || set.id_usuario_profesional !== undefined)) {
+          await bloquearAgenda(sesion, actual.id_paciente, resultante.id_usuario_profesional);
+          await exigirHorarioCitaLibre(sesion, {
+            idCita: aOid(id),
+            idPaciente: actual.id_paciente,
+            idProfesional: resultante.id_usuario_profesional,
+            fechaHora: resultante.fecha_hora,
+          });
+        }
         const filtro = { _id: aOid(id) };
         const cita = Object.keys(set).length > 0
           ? await col('citas').findOneAndUpdate(filtro, { $set: set }, { returnDocument: 'after', session: sesion })
@@ -467,6 +529,9 @@ function crearRepositorios(cn) {
         notas_clinicas: datos.notas_clinicas ?? null,
       }, { session: sesion, projection: { _id: 1 } });
       if (duplicada) throw new ConsultaDuplicada();
+      const idProfesional = idReferencia(datos.id_usuario_profesional, 'id_usuario_profesional');
+      await bloquearProfesional(sesion, idProfesional);
+      await exigirHorarioConsultaLibre(sesion, { idHistorial: historial._id, idProfesional, fechaHora: datos.fecha_hora });
 
       // Todo se resuelve y valida antes de escribir: una referencia inexistente revierte la unidad.
       const diagnosticos = await resolverDiagnosticos(db(), sesion, datos.diagnosticos);

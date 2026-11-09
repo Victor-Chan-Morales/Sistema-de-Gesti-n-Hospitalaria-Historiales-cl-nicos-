@@ -18,7 +18,16 @@ function normalizar(valor, clave) {
   return valor;
 }
 
-async function flujoCompleto(repos, actor, marca) {
+// Horas propias de cada ejecución: no se puede repetir la misma hora con el mismo profesional.
+// La cita va en el futuro; la consulta, en el pasado (no se registran consultas futuras).
+// Todos los motores de una misma ejecución usan las mismas horas, para comparar JSON idénticos.
+const horaEntre = (inicio, fin) => new Date(inicio + Math.random() * (fin - inicio)).toISOString().slice(0, 19);
+const horasDeEjecucion = () => ({
+  cita: horaEntre(Date.UTC(3000, 0, 1), Date.UTC(3001, 0, 1)),
+  consulta: horaEntre(Date.UTC(2000, 0, 1), Date.UTC(2025, 0, 1)),
+});
+
+async function flujoCompleto(repos, actor, marca, horas = horasDeEjecucion()) {
   const paciente = await pacientes.registrarPaciente(repos, actor, {
     nombres: 'Equivalencia',
     apellidos: `Motor ${marca}`,
@@ -29,11 +38,11 @@ async function flujoCompleto(repos, actor, marca) {
     telefonos: [{ numero: '5555-0000', tipo: 'Casa' }],
     contactos_emergencia: [{ nombres: 'Uno', apellidos: 'Dos', telefonos: [{ numero: '1', tipo: 'Celular' }] }],
   });
-  const profesional = (await repos.usuarios.listarProfesionales())[0];
+  // La cita la atiende quien registra la consulta: una cita solo se liga a su propio profesional.
   const cita = await citas.crearCita(repos, actor, {
     id_paciente: paciente.id_paciente,
-    id_usuario_profesional: profesional.id_usuario,
-    fecha_hora: '3000-01-31T23:59:59',
+    id_usuario_profesional: actor.id_usuario,
+    fecha_hora: horas.cita,
     motivo_consulta: 'Control',
   });
 
@@ -49,10 +58,10 @@ async function flujoCompleto(repos, actor, marca) {
   const atencion = await consultas.registrarAtencion(repos, actor, {
     id_paciente: paciente.id_paciente,
     id_cita: cita.id_cita,
-    fecha_hora: '3000-01-31T23:59:59',
+    fecha_hora: horas.consulta,
     motivo_consulta: 'Dolor con acentuación: ñandú',
     sintomas: 'Síntomas',
-    signos_vitales: { presion_arterial: '110/70', temperatura: 36.75, peso: 70.5, talla: 1.75, saturacion_oxigeno: 98 },
+    signos_vitales: { presion_arterial: '110/70', temperatura: 36.75, peso: 70.5, talla: 175, saturacion_oxigeno: 98 },
     diagnosticos: [{ id_catalogo_diag: diagnosticos[0].id_catalogo_diag, tipo: 'Definitivo' }],
     tratamientos: [{ descripcion: 'Tratamiento', fecha_inicio: '2030-01-01', fecha_fin: '2030-01-10' }],
     receta: { indicaciones_generales: 'Con comida', detalles: [{ id_medicamento: amoxicilina.id_medicamento, dosis: '1', frecuencia: '8h' }] },
@@ -70,4 +79,4 @@ async function flujoCompleto(repos, actor, marca) {
   });
 }
 
-module.exports = { normalizar, flujoCompleto };
+module.exports = { normalizar, flujoCompleto, horasDeEjecucion };

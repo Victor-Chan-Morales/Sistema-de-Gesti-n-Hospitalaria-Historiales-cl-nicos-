@@ -10,7 +10,7 @@ const mysql = require('../../src/adapters/persistence/mysql/conexion');
 const { crearRepositorios: reposPostgres } = require('../../src/adapters/persistence/postgres/repositorios');
 const { crearRepositorios: reposMysql } = require('../../src/adapters/persistence/mysql/repositorios');
 const pacientes = require('../../src/application/pacientes');
-const { flujoCompleto } = require('./apoyo/flujoEquivalencia');
+const { flujoCompleto, horasDeEjecucion } = require('./apoyo/flujoEquivalencia');
 
 describe('equivalencia entre PostgreSQL y MySQL', () => {
   let pg;
@@ -36,8 +36,9 @@ describe('equivalencia entre PostgreSQL y MySQL', () => {
   });
 
   it('el mismo flujo produce el mismo JSON', async () => {
-    const enPostgres = await flujoCompleto(pg.repos, actorPg, 'A');
-    const enMysql = await flujoCompleto(my.repos, actorMy, 'A');
+    const horas = horasDeEjecucion();
+    const enPostgres = await flujoCompleto(pg.repos, actorPg, 'A', horas);
+    const enMysql = await flujoCompleto(my.repos, actorMy, 'A', horas);
     assert.deepEqual(enMysql, enPostgres);
     assert.equal(enPostgres.atencion.advertencias.length, 1);
     assert.equal(enPostgres.atencion.consulta.signos_vitales.temperatura, 36.75);

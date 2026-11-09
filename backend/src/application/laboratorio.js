@@ -67,6 +67,7 @@ async function cambiarEstadoOrden(repos, actor, idOrden, datos) {
   const orden = await exigirOrden(examenes, idOrden);
   laboratorio.exigirTransicionOrden(orden.estado, estado);
   if (estado === 'Finalizada') laboratorio.exigirResultadosCompletos(orden);
+  if (estado === 'Cancelada') laboratorio.exigirSinResultadosParaCancelar(orden);
   return examenes.cambiarEstadoOrden(idOrden, estado, actor);
 }
 
@@ -78,7 +79,8 @@ async function registrarResultado(repos, actor, idOrden, datos) {
   laboratorio.exigirExamenDeLaOrden(orden, limpio.id_tipo_examen);
 
   const resultado = { fecha_resultado: hoy(), ...limpio };
-  laboratorio.exigirFechasResultado(resultado);
+  laboratorio.exigirResultadoConContenido(resultado);
+  laboratorio.exigirFechasResultado(resultado, orden.fecha_orden, hoy());
   return examenes.registrarResultado(idOrden, resultado, actor);
 }
 

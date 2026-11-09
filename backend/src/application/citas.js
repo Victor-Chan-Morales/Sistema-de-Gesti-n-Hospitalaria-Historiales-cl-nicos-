@@ -41,6 +41,7 @@ async function listarCitas(repos, filtros = {}) {
 
 async function actualizarCita(repos, actor, idCita, cambios) {
   const limpio = validar(cambios, esquemas.cambiosCita, { parcial: true });
+  reglas.exigirEstadoCitaManual(limpio.estado);
   reglas.exigirCitaModificable(await exigirCita(repos, idCita));
   if (limpio.fecha_hora) reglas.exigirFechaFutura(limpio.fecha_hora, ahora());
   if (limpio.id_usuario_profesional) await exigirProfesional(repos, limpio.id_usuario_profesional);

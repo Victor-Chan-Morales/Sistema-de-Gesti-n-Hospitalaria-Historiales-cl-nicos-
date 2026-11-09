@@ -49,6 +49,30 @@ function exigirProfesionalActivo(usuario) {
   }
 }
 
+// Una cita pasa a 'Atendida' solo al registrar su consulta (regla 5), nunca a mano.
+function exigirEstadoCitaManual(estado) {
+  if (estado === 'Atendida') {
+    throw new ReglaNegocio('Una cita pasa a Atendida solo al registrar su consulta.');
+  }
+}
+
+// Una consulta no puede registrarse en el futuro ni antes de que nazca el paciente.
+function exigirFechaAtencionValida(fechaHora, fechaNacimiento, referencia) {
+  if (fechaHora > referencia) {
+    throw new ReglaNegocio('La consulta no puede registrarse con una fecha y hora futura.');
+  }
+  if (fechaHora.slice(0, 10) < fechaNacimiento) {
+    throw new ReglaNegocio('La consulta no puede ser anterior al nacimiento del paciente.');
+  }
+}
+
+// Una consulta ligada a una cita solo puede registrarla el profesional al que está asignada.
+function exigirCitaDelProfesional(cita, idProfesional) {
+  if (String(cita.id_usuario_profesional) !== String(idProfesional)) {
+    throw new ReglaNegocio('La cita pertenece a otro profesional.');
+  }
+}
+
 function exigirFechaFutura(fechaHora, referencia) {
   if (fechaHora < referencia) {
     throw new ReglaNegocio('La fecha y hora de la cita no puede estar en el pasado.');
@@ -117,6 +141,9 @@ module.exports = {
   exigirPacienteArchivable,
   exigirProfesionalActivo,
   exigirFechaFutura,
+  exigirEstadoCitaManual,
+  exigirFechaAtencionValida,
+  exigirCitaDelProfesional,
   exigirCitaModificable,
   exigirConsultaEditable,
   exigirTransicionConsulta,

@@ -114,12 +114,15 @@ describe('laboratorio: casos de uso', () => {
     const examenes = crearExamenes({
       1: { estado: 'En proceso', examenes: [{ id_tipo_examen: '11' }, { id_tipo_examen: '12' }], resultados: [{ id_tipo_examen: '11' }] },
       2: { estado: 'En proceso', examenes: [{ id_tipo_examen: '11' }], resultados: [{ id_tipo_examen: '11' }] },
+      3: { estado: 'Pendiente', examenes: [{ id_tipo_examen: '11' }], resultados: [] },
     });
     const repos = { examenes };
     await assert.rejects(laboratorio.cambiarEstadoOrden(repos, actor, '1', { estado: 'Finalizada' }), ReglaNegocio);
     assert.equal((await laboratorio.cambiarEstadoOrden(repos, actor, '2', { estado: 'Finalizada' })).estado, 'Finalizada');
-    // Cancelar sigue permitido aunque falten resultados.
-    assert.equal((await laboratorio.cambiarEstadoOrden(repos, actor, '1', { estado: 'Cancelada' })).estado, 'Cancelada');
+    // Una orden sin resultados sí se cancela; una con resultados ya registrados no, porque esos
+    // resultados quedarían colgando de una orden cancelada y no pueden borrarse.
+    assert.equal((await laboratorio.cambiarEstadoOrden(repos, actor, '3', { estado: 'Cancelada' })).estado, 'Cancelada');
+    await assert.rejects(laboratorio.cambiarEstadoOrden(repos, actor, '1', { estado: 'Cancelada' }), ReglaNegocio);
   });
 
   it('la lista pone primero las órdenes abiertas más urgentes y al final las cerradas', async () => {

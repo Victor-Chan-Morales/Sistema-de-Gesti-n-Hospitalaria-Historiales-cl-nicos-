@@ -16,6 +16,13 @@ function exigirFechaNoFutura(fecha, referencia, campo) {
   if (fecha > referencia) throw new ReglaNegocio(`${campo} no puede estar en el futuro.`);
 }
 
+// Un control o una vacuna no puede ser anterior al nacimiento del paciente.
+function exigirNoAnteriorAlNacimiento(fecha, fechaNacimiento, campo) {
+  if (fecha < fechaNacimiento) {
+    throw new ReglaNegocio(`${campo} no puede ser anterior al nacimiento del paciente.`);
+  }
+}
+
 const MEDIDAS_DE_CONTROL = Object.freeze(['peso', 'talla', 'perimetro_cefalico', 'indice_masa_corporal']);
 
 // Un control sin ninguna medida no aporta nada al seguimiento del crecimiento.
@@ -35,6 +42,7 @@ module.exports = {
   LIMITE_EDAD_PEDIATRICA,
   exigirPacientePediatrico,
   exigirFechaNoFutura,
+  exigirNoAnteriorAlNacimiento,
   exigirAlgunaMedida,
   exigirProximaDosisPosterior,
 };
