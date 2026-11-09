@@ -34,12 +34,16 @@ const contiene = (valor, texto) => String(valor ?? '').toLowerCase().includes(St
 
 // Registro de auditoría de la regla 22. Cada adaptador lo guarda dentro de la misma
 // transacción que la escritura que describe.
-function registroAuditoria(actor, accion, entidad, idEntidad) {
+// id_entidad es el documento principal y id_detalle la subclave cuando la escritura afecta a un
+// registro dentro de otro (p. ej., el diagnóstico de una consulta). Cada motor pasa su propio
+// tipo de ID con comoId: ObjectId en MongoDB, cadena en Firestore.
+function registroAuditoria(actor, accion, entidad, idEntidad, { idDetalle = null, comoId = String } = {}) {
   return {
-    id_usuario: actor.id_usuario,
+    id_usuario: comoId(actor.id_usuario),
     accion,
     entidad,
-    id_entidad: String(idEntidad),
+    id_entidad: comoId(idEntidad),
+    id_detalle: idDetalle === null ? null : String(idDetalle),
     fecha_hora: ahora(),
   };
 }

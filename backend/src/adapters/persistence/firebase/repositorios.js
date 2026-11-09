@@ -111,8 +111,8 @@ function crearRepositorios(cn) {
     correos: correos(r.correos),
   }));
 
-  const auditar = (tx, actor, accion, entidad, idEntidad) =>
-    tx.create(col('auditoria').doc(), registroAuditoria(actor, accion, entidad, idEntidad));
+  const auditar = (tx, actor, accion, entidad, idEntidad, idDetalle = null) =>
+    tx.create(col('auditoria').doc(), registroAuditoria(actor, accion, entidad, idEntidad, { idDetalle }));
 
   // Lee el documento de un paciente dentro de la transacción; NoEncontrado si no existe.
   async function exigirPaciente(tx, idPaciente) {
@@ -328,7 +328,7 @@ function crearRepositorios(cn) {
         observaciones: datos.observaciones ?? null,
       };
       tx.create(ref, alergia);
-      auditar(tx, actor, 'CREAR', 'Historial_Alergia', `${idPaciente}-${catalogo.id}`);
+      auditar(tx, actor, 'CREAR', 'Historial_Alergia', idPaciente, catalogo.id);
       return alergia;
     }),
 
@@ -589,7 +589,7 @@ function crearRepositorios(cn) {
         }
         const diagnosticos = [...actual.diagnosticos, diagnostico];
         tx.update(snap.ref, { diagnosticos });
-        auditar(tx, actor, 'CREAR', 'Diagnostico_Consulta', `${id}-${diagnostico.id_catalogo_diag}`);
+        auditar(tx, actor, 'CREAR', 'Diagnostico_Consulta', id, diagnostico.id_catalogo_diag);
         return aContrato(id, 'id_consulta', { ...actual, diagnosticos });
       });
     },

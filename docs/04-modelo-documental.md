@@ -38,6 +38,8 @@ Ejemplo de un resultado:
 {
   "id_orden_laboratorio": "ObjectId",
   "id_tipo_examen": "ObjectId",
+  "id_historial": "ObjectId",
+  "id_paciente": "ObjectId",
   "fecha_toma_muestra": "2026-02-01",
   "fecha_resultado": "2026-02-02",
   "resultado_general": "Normal",
@@ -55,7 +57,8 @@ MongoDB no las tiene, así que el adaptador las sustituye:
 - **Unicidad:** índices únicos en `usuario`, `dpi_o_documento` (parcial: varios pacientes sin documento no chocan), `codigo_historial`, y `(orden, examen)` en resultados. Los crea el adaptador al primer uso.
 - **Una cita programada idéntica:** índice único parcial sobre `(paciente, profesional, fecha_hora)` solo cuando `estado = 'Programada'`.
 - **Referencias válidas:** antes de guardar una receta, un diagnóstico o una alergia, el adaptador comprueba que el registro del catálogo exista; si no, `DatosInvalidos` y se revierte todo.
-- **IDs:** se guardan como `ObjectId` y salen como string. Un ID con formato inválido equivale a "no existe".
+- **IDs:** se guardan como `ObjectId` y salen como string. Un ID con formato inválido equivale a "no existe". Esto incluye la auditoría: `auditoria.id_usuario` e `id_entidad` son `ObjectId`, y `resultados_laboratorio.id_usuario_laboratorista` también.
+- **Subclaves en la auditoría:** cuando una escritura afecta a un registro dentro de otro (una alergia del historial, un diagnóstico de la consulta), `id_entidad` guarda el documento principal y `id_detalle` la subclave. Antes se concatenaban en una sola cadena, lo que impedía unir la auditoría con las colecciones.
 
 ## Firebase (Firestore): Centro Médico Pediátrico (embebido mediante subcolecciones)
 

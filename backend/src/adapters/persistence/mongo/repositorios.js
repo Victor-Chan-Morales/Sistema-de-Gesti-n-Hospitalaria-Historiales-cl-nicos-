@@ -169,8 +169,12 @@ function crearRepositorios(cn) {
   const db = cn.db;
   const col = (nombre) => db().collection(nombre);
 
-  const auditar = (sesion, actor, accion, entidad, idEntidad) =>
-    col('auditoria').insertOne(registroAuditoria(actor, accion, entidad, idEntidad), { session: sesion });
+  // Mongo guarda los IDs de auditoría como ObjectId, igual que los IDs de sus documentos.
+  const auditar = (sesion, actor, accion, entidad, idEntidad, idDetalle = null) =>
+    col('auditoria').insertOne(
+      registroAuditoria(actor, accion, entidad, idEntidad, { idDetalle, comoId: aOid }),
+      { session: sesion },
+    );
 
   async function exigirHistorial(idPaciente, sesion) {
     const historial = esIdValido(idPaciente)
@@ -344,7 +348,7 @@ function crearRepositorios(cn) {
         { session: sesion },
       );
       if (modifiedCount === 0) throw new RegistroDuplicado('Ya existe un registro con esos datos.');
-      await auditar(sesion, actor, 'CREAR', 'Historial_Alergia', `${historial._id}-${idAlergia}`);
+      await auditar(sesion, actor, 'CREAR', 'Historial_Alergia', historial._id, idAlergia);
       return subdocumentoAContrato(alergia);
     }),
 
@@ -532,7 +536,7 @@ function crearRepositorios(cn) {
           throw new RegistroDuplicado('Ya existe un registro con esos datos.');
         }
         if (modifiedCount === 0) throw new RegistroDuplicado('Ya existe un registro con esos datos.');
-        await auditar(sesion, actor, 'CREAR', 'Diagnostico_Consulta', `${id}-${diagnostico.id_catalogo_diag}`);
+        await auditar(sesion, actor, 'CREAR', 'Diagnostico_Consulta', aOid(id), diagnostico.id_catalogo_diag);
         return consultaAContrato(await col('consultas').findOne({ _id: aOid(id) }, { session: sesion }));
       });
     },

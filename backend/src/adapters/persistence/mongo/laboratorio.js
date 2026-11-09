@@ -24,8 +24,9 @@ function ordenAContrato(orden, resultados = []) {
 
 function crearLaboratorio(cn) {
   const col = (nombre) => cn.db().collection(nombre);
+  // Mismo criterio que el resto de MongoDB: los IDs de auditoría son ObjectId.
   const auditar = (sesion, actor, accion, entidad, id) =>
-    col('auditoria').insertOne(registroAuditoria(actor, accion, entidad, id), { session: sesion });
+    col('auditoria').insertOne(registroAuditoria(actor, accion, entidad, id, { comoId: aOid }), { session: sesion });
 
   const resultadosDe = (idsOrden, sesion) => col('resultados_laboratorio')
     .find({ id_orden_laboratorio: { $in: idsOrden } }, { session: sesion })
@@ -146,7 +147,7 @@ function crearLaboratorio(cn) {
             rango_referencia: v.rango_referencia ?? null,
           })),
           observaciones: datos.observaciones ?? null,
-          id_usuario_laboratorista: actor.id_usuario,
+          id_usuario_laboratorista: aOid(actor.id_usuario),
         };
         try {
           await col('resultados_laboratorio').insertOne(resultado, { session: sesion });
